@@ -40,6 +40,8 @@ import { trackGitOperations } from '../shared/gitOperationTracking.js';
 import { interpretCommandResult } from './commandSemantics.js';
 import { powershellToolHasPermission } from './powershellPermissions.js';
 import { getDefaultTimeoutMs, getMaxTimeoutMs, getPrompt } from './prompt.js';
+import { evaluateGate } from '../ShellCommandTool/gate.js';
+import type { RiskClass, ShellIrMode } from '../ShellCommandTool/types.js';
 import { classifyPowerShellRisk, isReadOperation, isDestructive as isDestructiveRisk } from './risk.js';
 import { hasSyncSecurityConcerns, isReadOnlyCommand, resolveToCanonical } from './readOnlyValidation.js';
 import { POWERSHELL_TOOL_NAME } from './toolName.js';
@@ -266,7 +268,11 @@ const outputSchema = lazySchema(() => z.object({
   persistedOutputSize: z.number().optional().describe('Total output size in bytes when persisted'),
   backgroundTaskId: z.string().optional().describe('ID of the background task if command is running in background'),
   backgroundedByUser: z.boolean().optional().describe('True if the user manually backgrounded the command with Ctrl+B'),
-  assistantAutoBackgrounded: z.boolean().optional().describe('True if the command was auto-backgrounded by the assistant-mode blocking budget')
+  assistantAutoBackgrounded: z.boolean().optional().describe('True if the command was auto-backgrounded by the assistant-mode blocking budget'),
+  risk_class: z.string().optional().describe('Risk classification: R0_Read, R1_Reversible_mutation, R2_Irreversible, or Destructive_protected'),
+  is_read_operation: z.boolean().optional().describe('Whether the command is classified as a read-only operation'),
+  is_destructive: z.boolean().optional().describe('Whether the command is classified as destructive'),
+  stage_words: z.array(z.string()).optional().describe('Tokenized command words for audit and classification')
 }));
 type OutputSchema = ReturnType<typeof outputSchema>;
 export type Out = z.infer<OutputSchema>;
@@ -389,6 +395,33 @@ export const PowerShellTool = buildTool({
     };
   },
   async checkPermissions(input: PowerShellToolInput, context: Parameters<Tool['checkPermissions']>[1]): Promise<PermissionResult> {
+    // Coarse-grained RiskClass gate — layered on top of the fine-grained
+    // powershellToolHasPermission rule system. The RiskClass gate is
+    // fail-closed: if it says 'deny' or 'ask', we return immediately.
+    // If it says 'allow', we delegate to the finer-grained rules.
+    const cmdlet = extractCmdlet(input.command);
+    const words = input.command.trim().split(/\s+/);
+    const riskClass: RiskClass = classifyPowerShellRisk(cmdlet, words);
+    const mode: ShellIrMode = 'strict';
+    const isInSandbox = SandboxManager.isSandboxingEnabled();
+    const verdict = evaluateGate(riskClass, mode, isInSandbox);
+
+    if (verdict.behavior === 'deny') {
+      return {
+        behavior: 'deny',
+        updatedInput: input,
+        message: verdict.reason,
+      };
+    }
+    if (verdict.behavior === 'ask') {
+      return {
+        behavior: 'ask',
+        updatedInput: input,
+        message: verdict.reason,
+      };
+    }
+
+    // RiskClass gate allows — delegate to fine-grained PowerShell rules
     return await powershellToolHasPermission(input, context);
   },
   renderToolUseMessage,
@@ -405,7 +438,11 @@ export const PowerShellTool = buildTool({
     persistedOutputSize,
     backgroundTaskId,
     backgroundedByUser,
-    assistantAutoBackgrounded
+    assistantAutoBackgrounded,
+    risk_class,
+    is_read_operation,
+    is_destructive,
+    stage_words
   }: Out, toolUseID: string): ToolResultBlockParam {
     // For image data, format as image content block for Claude
     if (isImage) {
@@ -443,10 +480,26 @@ export const PowerShellTool = buildTool({
         backgroundInfo = `Command running in background with ID: ${backgroundTaskId}. Output is being written to: ${outputPath}`;
       }
     }
+    // Structured RiskClass metadata — same taxonomy as ShellCommandTool
+    const riskMeta: string[] = [];
+    if (risk_class) {
+      riskMeta.push(`[risk_class: ${risk_class}]`);
+    }
+    if (is_read_operation !== undefined) {
+      riskMeta.push(`[is_read: ${is_read_operation}]`);
+    }
+    if (is_destructive !== undefined) {
+      riskMeta.push(`[is_destructive: ${is_destructive}]`);
+    }
+    if (stage_words && stage_words.length > 0) {
+      riskMeta.push(`[stage_words: ${stage_words.join(' ')}]`);
+    }
+    const metaLine = riskMeta.join(' ');
+
     return {
       tool_use_id: toolUseID,
       type: 'tool_result' as const,
-      content: [processedStdout, errorMessage, backgroundInfo].filter(Boolean).join('\n'),
+      content: [metaLine, processedStdout, errorMessage, backgroundInfo].filter(Boolean).join('\n'),
       is_error: interrupted
     };
   },
@@ -467,6 +520,14 @@ export const PowerShellTool = buildTool({
     } = toolUseContext;
     const isMainThread = !toolUseContext.agentId;
     let progressCounter = 0;
+
+    // RiskClass classification — same taxonomy as ShellCommandTool
+    const cmdlet = extractCmdlet(input.command);
+    const words = input.command.trim().split(/\s+/);
+    const riskClass: RiskClass = classifyPowerShellRisk(cmdlet, words);
+    const _isReadOperation = isReadOperation(riskClass);
+    const _isDestructive = isDestructiveRisk(riskClass);
+
     try {
       const commandGenerator = runPowerShellCommand({
         input,
@@ -556,7 +617,11 @@ export const PowerShellTool = buildTool({
             interrupted: false,
             backgroundTaskId: result.backgroundTaskId,
             backgroundedByUser: result.backgroundedByUser,
-            assistantAutoBackgrounded: result.assistantAutoBackgrounded
+            assistantAutoBackgrounded: result.assistantAutoBackgrounded,
+            risk_class: riskClass,
+            is_read_operation: _isReadOperation,
+            is_destructive: _isDestructive,
+            stage_words: words
           }
         };
       }
@@ -665,7 +730,11 @@ export const PowerShellTool = buildTool({
           returnCodeInterpretation: interpretation.message,
           isImage,
           persistedOutputPath,
-          persistedOutputSize
+          persistedOutputSize,
+          risk_class: riskClass,
+          is_read_operation: _isReadOperation,
+          is_destructive: _isDestructive,
+          stage_words: words
         }
       };
     } finally {
