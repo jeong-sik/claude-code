@@ -515,9 +515,9 @@ async function processUserInputBase(
 
   // Bash commands
   if (inputString !== null && mode === 'bash') {
-    const { processBashCommand } = await import('./processBashCommand.js')
+    const { processShellCommand } = await import('./processShellCommand.js')
     return addImageMetadataMessage(
-      await processBashCommand(
+      await processShellCommand(
         inputString,
         precedingInputBlocks,
         attachmentMessages,

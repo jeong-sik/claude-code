@@ -1,5 +1,6 @@
 import { feature } from 'bun:bundle'
 import { AGENT_TOOL_NAME } from '../../tools/AgentTool/constants.js'
+import { SHELL_COMMAND_TOOL_NAME } from '../../tools/ShellCommandTool/toolName.js'
 import { TASK_OUTPUT_TOOL_NAME } from '../../tools/TaskOutputTool/constants.js'
 import { TASK_STOP_TOOL_NAME } from '../../tools/TaskStopTool/prompt.js'
 import type { PermissionRuleValue } from './PermissionRule.js'
@@ -19,6 +20,7 @@ const BRIEF_TOOL_NAME: string | null =
 // When a tool is renamed, add old → new here so permission rules,
 // hooks, and persisted wire names resolve to the canonical name.
 const LEGACY_TOOL_NAME_ALIASES: Record<string, string> = {
+  Bash: SHELL_COMMAND_TOOL_NAME,
   Task: AGENT_TOOL_NAME,
   KillShell: TASK_STOP_TOOL_NAME,
   AgentOutputTool: TASK_OUTPUT_TOOL_NAME,

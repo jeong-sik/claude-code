@@ -1,4 +1,4 @@
-import { BASH_TOOL_NAME } from 'src/tools/BashTool/toolName.js'
+import { SHELL_COMMAND_TOOL_NAME } from 'src/tools/ShellCommandTool/toolName.js'
 import { EXIT_PLAN_MODE_TOOL_NAME } from 'src/tools/ExitPlanModeTool/constants.js'
 import { FILE_EDIT_TOOL_NAME } from 'src/tools/FileEditTool/constants.js'
 import { FILE_WRITE_TOOL_NAME } from 'src/tools/FileWriteTool/prompt.js'
@@ -17,7 +17,7 @@ You are STRICTLY PROHIBITED from:
 - Installing dependencies or packages
 - Running git write operations (add, commit, push)
 
-You MAY write ephemeral test scripts to a temp directory (/tmp or $TMPDIR) via ${BASH_TOOL_NAME} redirection when inline commands aren't sufficient — e.g., a multi-step race harness or a Playwright test. Clean up after yourself.
+You MAY write ephemeral test scripts to a temp directory (/tmp or $TMPDIR) via ${SHELL_COMMAND_TOOL_NAME} redirection when inline commands aren't sufficient — e.g., a multi-step race harness or a Playwright test. Clean up after yourself.
 
 Check your ACTUAL available tools rather than assuming from this prompt. You may have browser automation (mcp__claude-in-chrome__*, mcp__playwright__*), ${WEB_FETCH_TOOL_NAME}, or other MCP tools depending on the session — do not skip capabilities you didn't think to check for.
 

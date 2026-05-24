@@ -7,8 +7,8 @@ import { isENOENT } from 'src/utils/errors.js';
 import { detectEncodingForResolvedPath } from 'src/utils/fileRead.js';
 import { getFsImplementation } from 'src/utils/fsOperations.js';
 import { Text } from '../../../ink.js';
-import { BashTool } from '../../../tools/BashTool/BashTool.js';
-import { applySedSubstitution, type SedEditInfo } from '../../../tools/BashTool/sedEditParser.js';
+import { ShellCommandTool } from '../../../tools/ShellCommandTool/ShellCommandTool.js';
+import { applySedSubstitution, type SedEditInfo } from '../../../tools/ShellCommandTool/sedEditParser.js';
 import { FilePermissionDialog } from '../FilePermissionDialog/FilePermissionDialog.js';
 import type { PermissionRequestProps } from '../PermissionRequest.js';
 type SedEditPermissionRequestProps = PermissionRequestProps & {
@@ -154,13 +154,10 @@ function SedEditPermissionRequestInner(t0) {
   let t4;
   if ($[11] !== filePath || $[12] !== newContent) {
     t4 = input => {
-      const parsed = BashTool.inputSchema.parse(input);
+      const parsed = ShellCommandTool.inputSchema.parse(input);
       return {
         ...parsed,
-        _simulatedSedEdit: {
-          filePath,
-          newContent
-        }
+        command: `sed -i 's/${sedInfo.pattern}/${sedInfo.replacement}/g' ${filePath}`,
       };
     };
     $[11] = filePath;

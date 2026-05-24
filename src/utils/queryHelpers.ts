@@ -8,7 +8,7 @@ import type { SDKMessage } from 'src/entrypoints/agentSdkTypes.js'
 import type { CanUseToolFn } from '../hooks/useCanUseTool.js'
 import { runTools } from '../services/tools/toolOrchestration.js'
 import { findToolByName, type Tool, type Tools } from '../Tool.js'
-import { BASH_TOOL_NAME } from '../tools/BashTool/toolName.js'
+import { SHELL_COMMAND_TOOL_NAME } from '../tools/ShellCommandTool/toolName.js'
 import { FILE_EDIT_TOOL_NAME } from '../tools/FileEditTool/constants.js'
 import type { Input as FileReadInput } from '../tools/FileReadTool/FileReadTool.js'
 import {
@@ -501,10 +501,10 @@ export function extractReadFilesFromMessages(
 }
 
 /**
- * Extract the top-level CLI tools used in BashTool calls from message history.
+ * Extract the top-level CLI tools used in ShellCommandTool calls from message history.
  * Returns a deduplicated set of command names (e.g. 'vercel', 'aws', 'git').
  */
-export function extractBashToolsFromMessages(messages: Message[]): Set<string> {
+export function extractShellCommandsFromMessages(messages: Message[]): Set<string> {
   const tools = new Set<string>()
   for (const message of messages) {
     if (
@@ -512,7 +512,7 @@ export function extractBashToolsFromMessages(messages: Message[]): Set<string> {
       Array.isArray(message.message.content)
     ) {
       for (const content of message.message.content) {
-        if (content.type === 'tool_use' && content.name === BASH_TOOL_NAME) {
+        if (content.type === 'tool_use' && content.name === SHELL_COMMAND_TOOL_NAME) {
           const { input } = content
           if (
             typeof input !== 'object' ||

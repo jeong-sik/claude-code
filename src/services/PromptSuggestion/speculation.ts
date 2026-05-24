@@ -10,8 +10,7 @@ import {
   type SpeculationResult,
   type SpeculationState,
 } from '../../state/AppStateStore.js'
-import { commandHasAnyCd } from '../../tools/BashTool/bashPermissions.js'
-import { checkReadOnlyConstraints } from '../../tools/BashTool/readOnlyValidation.js'
+import { checkReadOnlyConstraints } from '../../tools/ShellCommandTool/readOnlyValidation.js'
 import type { SpeculationAcceptMessage } from '../../types/logs.js'
 import type { Message } from '../../types/message.js'
 import { createChildAbortController } from '../../utils/abortController.js'
@@ -574,14 +573,14 @@ export async function startSpeculation(
         }
 
         // Stop at non-read-only bash commands
-        if (tool.name === 'Bash') {
+        if (tool.name === 'ShellCommand') {
           const command =
             'command' in input && typeof input.command === 'string'
               ? input.command
               : ''
           if (
             !command ||
-            checkReadOnlyConstraints({ command }, commandHasAnyCd(command))
+            checkReadOnlyConstraints({ command })
               .behavior !== 'allow'
           ) {
             logForDebugging(

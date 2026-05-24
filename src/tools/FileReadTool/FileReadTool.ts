@@ -73,7 +73,7 @@ import { matchWildcardPattern } from '../../utils/permissions/shellRuleMatching.
 import { readFileInRange } from '../../utils/readFileInRange.js'
 import { semanticNumber } from '../../utils/semanticNumber.js'
 import { jsonStringify } from '../../utils/slowOperations.js'
-import { BASH_TOOL_NAME } from '../BashTool/toolName.js'
+import { SHELL_COMMAND_TOOL_NAME } from '../ShellCommandTool/toolName.js'
 import { getDefaultFileReadingLimits } from './limits.js'
 import {
   DESCRIPTION,
@@ -827,7 +827,7 @@ async function callInner(
     if (cellsJsonBytes > maxSizeBytes) {
       throw new Error(
         `Notebook content (${formatFileSize(cellsJsonBytes)}) exceeds maximum allowed size (${formatFileSize(maxSizeBytes)}). ` +
-          `Use ${BASH_TOOL_NAME} with jq to read specific portions:\n` +
+          `Use ${SHELL_COMMAND_TOOL_NAME} with jq to read specific portions:\n` +
           `  cat "${file_path}" | jq '.cells[:20]' # First 20 cells\n` +
           `  cat "${file_path}" | jq '.cells[100:120]' # Cells 100-120\n` +
           `  cat "${file_path}" | jq '.cells | length' # Count total cells\n` +

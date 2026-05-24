@@ -266,7 +266,7 @@ export function CollapsedReadSearchContent({
     return null;
   }
 
-  // Find the slowest in-progress shell command in this group. BashTool yields
+  // Find the slowest in-progress shell command in this group. ShellCommandTool yields
   // progress every second but the collapsed renderer never showed it — long
   // commands (npm install, tests) looked frozen. Shown after 2s so fast
   // commands stay clean; the ticking counter reassures that slow ones aren't stuck.

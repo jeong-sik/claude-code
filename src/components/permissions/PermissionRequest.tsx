@@ -7,7 +7,7 @@ import { useNotifyAfterTimeout } from '../../hooks/useNotifyAfterTimeout.js';
 import { useKeybinding } from '../../keybindings/useKeybinding.js';
 import type { AnyObject, Tool, ToolUseContext } from '../../Tool.js';
 import { AskUserQuestionTool } from '../../tools/AskUserQuestionTool/AskUserQuestionTool.js';
-import { BashTool } from '../../tools/BashTool/BashTool.js';
+import { ShellCommandTool } from '../../tools/ShellCommandTool/ShellCommandTool.js';
 import { FileEditTool } from '../../tools/FileEditTool/FileEditTool.js';
 import { FileReadTool } from '../../tools/FileReadTool/FileReadTool.js';
 import { FileWriteTool } from '../../tools/FileWriteTool/FileWriteTool.js';
@@ -20,7 +20,7 @@ import { WebFetchTool } from '../../tools/WebFetchTool/WebFetchTool.js';
 import type { AssistantMessage } from '../../types/message.js';
 import type { PermissionDecision } from '../../utils/permissions/PermissionResult.js';
 import { AskUserQuestionPermissionRequest } from './AskUserQuestionPermissionRequest/AskUserQuestionPermissionRequest.js';
-import { BashPermissionRequest } from './BashPermissionRequest/BashPermissionRequest.js';
+import { ShellCommandPermissionRequest } from './ShellCommandPermissionRequest/ShellCommandPermissionRequest.js';
 import { EnterPlanModePermissionRequest } from './EnterPlanModePermissionRequest/EnterPlanModePermissionRequest.js';
 import { ExitPlanModePermissionRequest } from './ExitPlanModePermissionRequest/ExitPlanModePermissionRequest.js';
 import { FallbackPermissionRequest } from './FallbackPermissionRequest.js';
@@ -50,8 +50,8 @@ function permissionComponentForTool(tool: Tool): React.ComponentType<PermissionR
       return FileEditPermissionRequest;
     case FileWriteTool:
       return FileWritePermissionRequest;
-    case BashTool:
-      return BashPermissionRequest;
+    case ShellCommandTool:
+      return ShellCommandPermissionRequest;
     case PowerShellTool:
       return PowerShellPermissionRequest;
     case ReviewArtifactTool:

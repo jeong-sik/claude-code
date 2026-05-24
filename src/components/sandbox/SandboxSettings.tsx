@@ -58,7 +58,7 @@ export function SandboxSettings(t0) {
     t2 = $[2];
   }
   const currentIndicator = t2;
-  const t3 = currentMode === "auto-allow" ? `Sandbox BashTool, with auto-allow ${currentIndicator}` : "Sandbox BashTool, with auto-allow";
+  const t3 = currentMode === "auto-allow" ? `Sandbox Shell, with auto-allow ${currentIndicator}` : "Sandbox Shell, with auto-allow";
   let t4;
   if ($[3] !== t3) {
     t4 = {
@@ -70,7 +70,7 @@ export function SandboxSettings(t0) {
   } else {
     t4 = $[4];
   }
-  const t5 = currentMode === "regular" ? `Sandbox BashTool, with regular permissions ${currentIndicator}` : "Sandbox BashTool, with regular permissions";
+  const t5 = currentMode === "regular" ? `Sandbox Shell, with regular permissions ${currentIndicator}` : "Sandbox Shell, with regular permissions";
   let t6;
   if ($[5] !== t5) {
     t6 = {

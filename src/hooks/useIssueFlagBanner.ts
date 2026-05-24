@@ -1,5 +1,5 @@
 import { useMemo, useRef } from 'react'
-import { BASH_TOOL_NAME } from '../tools/BashTool/toolName.js'
+import { SHELL_COMMAND_TOOL_NAME } from '../tools/ShellCommandTool/toolName.js'
 import type { Message } from '../types/message.js'
 import { getUserMessageText } from '../utils/messages.js'
 
@@ -59,7 +59,7 @@ export function isSessionContainerCompatible(messages: Message[]): boolean {
       if (toolName.startsWith('mcp__')) {
         return false
       }
-      if (toolName === BASH_TOOL_NAME) {
+      if (toolName === SHELL_COMMAND_TOOL_NAME) {
         const input = (block as { input?: Record<string, unknown> }).input
         const command = (input?.command as string) || ''
         if (EXTERNAL_COMMAND_PATTERNS.some(p => p.test(command))) {

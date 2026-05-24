@@ -3,8 +3,8 @@ import type {
   TextBlockParam,
   ToolResultBlockParam,
 } from '@anthropic-ai/sdk/resources/index.mjs'
-import { BASH_TOOL_NAME } from '../tools/BashTool/toolName.js'
-import { formatOutput } from '../tools/BashTool/utils.js'
+import { SHELL_COMMAND_TOOL_NAME } from '../tools/ShellCommandTool/toolName.js'
+import { formatOutput } from '../tools/ShellCommandTool/utils.js'
 import type {
   NotebookCell,
   NotebookCellOutput,
@@ -105,7 +105,7 @@ function processCell(
       cellData.outputs = [
         {
           output_type: 'stream',
-          text: `Outputs are too large to include. Use ${BASH_TOOL_NAME} with: cat <notebook_path> | jq '.cells[${index}].outputs'`,
+          text: `Outputs are too large to include. Use ${SHELL_COMMAND_TOOL_NAME} with: cat <notebook_path> | jq '.cells[${index}].outputs'`,
         },
       ]
     } else {

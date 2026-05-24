@@ -3,7 +3,7 @@
  *
  * Extracts file paths from PowerShell commands using the AST parser
  * and validates they stay within allowed project directories.
- * Follows the same patterns as BashTool/pathValidation.ts.
+ * Follows the same patterns as ShellCommandTool/pathValidation.ts.
  */
 
 import { homedir } from 'os'
@@ -858,7 +858,7 @@ export function dangerousRemovalDeny(path: string): PermissionResult {
 
 /**
  * Checks if a resolved path is allowed for the given operation type.
- * Mirrors the logic in BashTool/pathValidation.ts isPathAllowed.
+ * Mirrors the logic in ShellCommandTool/pathValidation.ts isPathAllowed.
  */
 function isPathAllowed(
   resolvedPath: string,
@@ -1518,7 +1518,7 @@ function extractPathsFromCommand(cmd: ParsedCommandElement): {
  *   statement cannot be trusted — PowerShell executes statements sequentially
  *   and a cd in statement N changes the cwd for statement N+1, but this
  *   validator resolves all paths against the stale Node process cwd.
- *   BashTool parity (BashTool/pathValidation.ts:630-655).
+ *   ShellCommandTool parity (ShellCommandTool/pathValidation.ts:630-655).
  *
  * @returns
  * - 'ask' if any path command tries to access outside allowed directories
@@ -1574,8 +1574,8 @@ function checkPathConstraintsForStatement(
   const cwd = getCwd()
   let firstAsk: PermissionResult | undefined
 
-  // SECURITY: BashTool parity — block path operations in compound commands
-  // containing a cwd-changing cmdlet (BashTool/pathValidation.ts:630-655).
+  // SECURITY: ShellCommandTool parity — block path operations in compound commands
+  // containing a cwd-changing cmdlet (ShellCommandTool/pathValidation.ts:630-655).
   //
   // When the compound contains Set-Location/Push-Location/Pop-Location/
   // New-PSDrive, relative paths in later statements resolve against the
@@ -1596,7 +1596,7 @@ function checkPathConstraintsForStatement(
   //   - Error cases where the cd target can't be statically determined
   // For now we take the conservative approach of requiring manual approval.
   //
-  // Unlike BashTool which gates on `operationType !== 'read'`, we also block
+  // Unlike ShellCommandTool which gates on `operationType !== 'read'`, we also block
   // READS (finding #27): `Set-Location ~; Get-Content ./.ssh/id_rsa` bypasses
   // Read(~/.ssh/**) deny rules because the validator matched the deny against
   // /project/.ssh/id_rsa. Reads from mis-resolved paths leak data just as
@@ -1721,7 +1721,7 @@ function checkPathConstraintsForStatement(
     }
 
     // SECURITY: bash-parity hard-deny for removal cmdlets on
-    // system-critical paths. BashTool has isDangerousRemovalPath which
+    // system-critical paths. ShellCommandTool has isDangerousRemovalPath which
     // hard-DENIES `rm /`, `rm ~`, `rm /etc`, etc. regardless of user config.
     // Port: remove-item (and aliases rm/del/ri/rd/rmdir/erase → resolveToCanonical)
     // on a dangerous path → deny (not ask). User cannot approve system32 deletion.

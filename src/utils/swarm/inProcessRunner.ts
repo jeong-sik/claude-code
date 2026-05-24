@@ -46,8 +46,7 @@ import {
 } from '../../tasks/LocalAgentTask/LocalAgentTask.js'
 import type { CustomAgentDefinition } from '../../tools/AgentTool/loadAgentsDir.js'
 import { runAgent } from '../../tools/AgentTool/runAgent.js'
-import { awaitClassifierAutoApproval } from '../../tools/BashTool/bashPermissions.js'
-import { BASH_TOOL_NAME } from '../../tools/BashTool/toolName.js'
+import { SHELL_COMMAND_TOOL_NAME } from '../../tools/ShellCommandTool/toolName.js'
 import { SEND_MESSAGE_TOOL_NAME } from '../../tools/SendMessageTool/constants.js'
 import { TASK_CREATE_TOOL_NAME } from '../../tools/TaskCreateTool/constants.js'
 import { TASK_GET_TOOL_NAME } from '../../tools/TaskGetTool/constants.js'
@@ -119,7 +118,7 @@ const PERMISSION_POLL_INTERVAL_MS = 500
  *
  * Always uses the leader's ToolUseConfirm dialog with a worker badge when
  * the bridge is available, giving teammates the same tool-specific UI
- * (BashPermissionRequest, FileEditToolDiff, etc.) as the leader's own tools.
+ * (ShellCommandPermissionRequest, FileEditToolDiff, etc.) as the leader's own tools.
  *
  * Falls back to the mailbox system when the bridge is unavailable:
  * sends a permission request to the leader's inbox, waits for the response
@@ -153,27 +152,6 @@ function createInProcessCanUseTool(
       return result
     }
 
-    // For bash commands, try classifier auto-approval before showing leader dialog.
-    // Agents await the classifier result (rather than racing it against user
-    // interaction like the main agent).
-    if (
-      feature('BASH_CLASSIFIER') &&
-      tool.name === BASH_TOOL_NAME &&
-      result.pendingClassifierCheck
-    ) {
-      const classifierDecision = await awaitClassifierAutoApproval(
-        result.pendingClassifierCheck,
-        abortController.signal,
-        toolUseContext.options.isNonInteractiveSession,
-      )
-      if (classifierDecision) {
-        return {
-          behavior: 'allow',
-          updatedInput: input as Record<string, unknown>,
-          decisionReason: classifierDecision,
-        }
-      }
-    }
 
     // Check if aborted before showing UI
     if (abortController.signal.aborted) {

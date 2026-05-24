@@ -26,7 +26,7 @@ import { validateBoundedIntEnvVar } from '../utils/envValidation.js';
 import { pathExists } from '../utils/file.js';
 import { cleanupStaleLocks, getAllLockInfo, isPidBasedLockingEnabled, type LockInfo } from '../utils/nativeInstaller/pidLock.js';
 import { getInitialSettings } from '../utils/settings/settings.js';
-import { BASH_MAX_OUTPUT_DEFAULT, BASH_MAX_OUTPUT_UPPER_LIMIT } from '../utils/shell/outputLimits.js';
+import { SHELL_MAX_OUTPUT_DEFAULT, SHELL_MAX_OUTPUT_UPPER_LIMIT } from '../utils/shell/outputLimits.js';
 import { TASK_MAX_OUTPUT_DEFAULT, TASK_MAX_OUTPUT_UPPER_LIMIT } from '../utils/task/outputFormatting.js';
 import { getXDGStateHome } from '../utils/xdg.js';
 type Props = {
@@ -142,9 +142,9 @@ export function Doctor(t0) {
   let t4;
   if ($[5] === Symbol.for("react.memo_cache_sentinel")) {
     const envVars = [{
-      name: "BASH_MAX_OUTPUT_LENGTH",
-      default: BASH_MAX_OUTPUT_DEFAULT,
-      upperLimit: BASH_MAX_OUTPUT_UPPER_LIMIT
+      name: "SHELL_MAX_OUTPUT_LENGTH",
+      default: SHELL_MAX_OUTPUT_DEFAULT,
+      upperLimit: SHELL_MAX_OUTPUT_UPPER_LIMIT
     }, {
       name: "TASK_MAX_OUTPUT_LENGTH",
       default: TASK_MAX_OUTPUT_DEFAULT,

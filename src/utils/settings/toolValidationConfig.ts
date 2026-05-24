@@ -92,8 +92,8 @@ export function isFilePatternTool(toolName: string): boolean {
   return TOOL_VALIDATION_CONFIG.filePatternTools.includes(toolName)
 }
 
-// Helper to check if a tool uses bash prefix patterns
-export function isBashPrefixTool(toolName: string): boolean {
+// Helper to check if a tool uses shell prefix patterns
+export function isShellPrefixTool(toolName: string): boolean {
   return TOOL_VALIDATION_CONFIG.bashPrefixTools.includes(toolName)
 }
 

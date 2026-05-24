@@ -25,7 +25,7 @@ import type { IDESelection } from '../hooks/useIdeSelection.js'
 import { TODO_WRITE_TOOL_NAME } from '../tools/TodoWriteTool/constants.js'
 import { TASK_CREATE_TOOL_NAME } from '../tools/TaskCreateTool/constants.js'
 import { TASK_UPDATE_TOOL_NAME } from '../tools/TaskUpdateTool/constants.js'
-import { BASH_TOOL_NAME } from '../tools/BashTool/toolName.js'
+import { SHELL_COMMAND_TOOL_NAME } from '../tools/ShellCommandTool/toolName.js'
 import { SKILL_TOOL_NAME } from '../tools/SkillTool/constants.js'
 import type { TodoList } from './todo/types.js'
 import {
@@ -2856,7 +2856,7 @@ async function getDiagnosticAttachments(
 ): Promise<Attachment[]> {
   // Diagnostics are only useful if the agent has the Bash tool to act on them
   if (
-    !toolUseContext.options.tools.some(t => toolMatchesName(t, BASH_TOOL_NAME))
+    !toolUseContext.options.tools.some(t => toolMatchesName(t, SHELL_COMMAND_TOOL_NAME))
   ) {
     return []
   }
@@ -2885,7 +2885,7 @@ async function getLSPDiagnosticAttachments(
 ): Promise<Attachment[]> {
   // LSP diagnostics are only useful if the agent has the Bash tool to act on them
   if (
-    !toolUseContext.options.tools.some(t => toolMatchesName(t, BASH_TOOL_NAME))
+    !toolUseContext.options.tools.some(t => toolMatchesName(t, SHELL_COMMAND_TOOL_NAME))
   ) {
     return []
   }

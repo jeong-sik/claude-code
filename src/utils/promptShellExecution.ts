@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto'
 import type { Tool, ToolUseContext } from '../Tool.js'
-import { BashTool } from '../tools/BashTool/BashTool.js'
+import { ShellCommandTool } from '../tools/ShellCommandTool/ShellCommandTool.js'
 import { logForDebugging } from './debug.js'
 import { errorMessage, MalformedCommandError, ShellError } from './errors.js'
 import type { FrontmatterShell } from './frontmatterParser.js'
@@ -8,12 +8,10 @@ import { createAssistantMessage } from './messages.js'
 import { hasPermissionsToUseTool } from './permissions/permissions.js'
 import { processToolResultBlock } from './toolResultStorage.js'
 
-// Narrow structural slice both BashTool and PowerShellTool satisfy. We can't
+// Narrow structural slice both ShellCommandTool and PowerShellTool satisfy. We can't
 // use the base Tool type: it marks call()'s canUseTool/parentMessage as
 // required, but both concrete tools have them optional and the original code
-// called BashTool.call({ command }, ctx) with just 2 args. We can't use
-// `typeof BashTool` either: BashTool's input schema has fields (e.g.
-// _simulatedSedEdit) that PowerShellTool's does not.
+// called ShellCommandTool.call({ command }, ctx) with just 2 args.
 // NOTE: call() is invoked directly here, bypassing validateInput — any
 // load-bearing check must live in call() itself (see PR #23311).
 type ShellOut = { stdout: string; stderr: string; interrupted: boolean }
@@ -75,12 +73,12 @@ export async function executeShellCommandsInPrompt(
   let result = text
 
   // Resolve the tool once. `shell === undefined` and `shell === 'bash'` both
-  // hit BashTool. PowerShell only when the runtime gate allows — a skill
+  // hit ShellCommandTool. PowerShell only when the runtime gate allows — a skill
   // author's frontmatter choice doesn't override the user's opt-in/out.
   const shellTool: PromptShellTool =
     shell === 'powershell' && isPowerShellToolEnabled()
       ? getPowerShellTool()
-      : BashTool
+      : ShellCommandTool
 
   // INLINE_PATTERN's lookbehind is ~100x slower than BLOCK_PATTERN on large
   // skill content (265µs vs 2µs @ 17KB). 93% of skills have no !` at all,

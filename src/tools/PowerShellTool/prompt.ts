@@ -5,8 +5,8 @@ import {
   type PowerShellEdition,
 } from '../../utils/shell/powershellDetection.js'
 import {
-  getDefaultBashTimeoutMs,
-  getMaxBashTimeoutMs,
+  getDefaultShellTimeoutMs,
+  getMaxShellTimeoutMs,
 } from '../../utils/timeouts.js'
 import { FILE_EDIT_TOOL_NAME } from '../FileEditTool/constants.js'
 import { FILE_READ_TOOL_NAME } from '../FileReadTool/prompt.js'
@@ -16,11 +16,11 @@ import { GREP_TOOL_NAME } from '../GrepTool/prompt.js'
 import { POWERSHELL_TOOL_NAME } from './toolName.js'
 
 export function getDefaultTimeoutMs(): number {
-  return getDefaultBashTimeoutMs()
+  return getDefaultShellTimeoutMs()
 }
 
 export function getMaxTimeoutMs(): number {
-  return getMaxBashTimeoutMs()
+  return getMaxShellTimeoutMs()
 }
 
 function getBackgroundUsageNote(): string | null {

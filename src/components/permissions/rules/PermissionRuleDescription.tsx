@@ -1,7 +1,7 @@
 import { c as _c } from "react/compiler-runtime";
 import * as React from 'react';
 import { Text } from '../../../ink.js';
-import { BashTool } from '../../../tools/BashTool/BashTool.js';
+import { ShellCommandTool } from '../../../tools/ShellCommandTool/ShellCommandTool.js';
 import type { PermissionRuleValue } from '../../../utils/permissions/PermissionRule.js';
 type RuleSubtitleProps = {
   ruleValue: PermissionRuleValue;
@@ -12,7 +12,7 @@ export function PermissionRuleDescription(t0) {
     ruleValue
   } = t0;
   switch (ruleValue.toolName) {
-    case BashTool.name:
+    case ShellCommandTool.name:
       {
         if (ruleValue.ruleContent) {
           if (ruleValue.ruleContent.endsWith(":*")) {

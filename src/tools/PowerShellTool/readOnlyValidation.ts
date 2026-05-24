@@ -477,7 +477,7 @@ export const CMDLET_ALLOWLIST: Record<string, CommandConfig> = Object.assign(
     // =========================================================================
     // PowerShell Cmdlets - Output & misc (no side effects)
     // =========================================================================
-    // Bash parity: `echo` is auto-allowed via custom regex (BashTool
+    // Bash parity: `echo` is auto-allowed via custom regex (ShellCommandTool
     // readOnlyValidation.ts:~1517). That regex WHITELISTS safe chars per arg.
     // See argLeaksValue above for the three attack shapes it blocks.
     'write-output': {
@@ -497,7 +497,7 @@ export const CMDLET_ALLOWLIST: Record<string, CommandConfig> = Object.assign(
       ],
       additionalCommandIsDangerousCallback: argLeaksValue,
     },
-    // Bash parity: `sleep` is in READONLY_COMMANDS (BashTool
+    // Bash parity: `sleep` is in READONLY_COMMANDS (ShellCommandTool
     // readOnlyValidation.ts:~1146). Zero side effects at runtime — but
     // `Start-Sleep $env:SECRET` leaks via type-coerce error. Same guard.
     'start-sleep': {
@@ -737,7 +737,7 @@ export const CMDLET_ALLOWLIST: Record<string, CommandConfig> = Object.assign(
     // where.exe: Windows PATH locator, bash `which` equivalent. Reaches here via
     // SAFE_EXTERNAL_EXES bypass at the nameType gate in isAllowlistedCommand.
     // All flags are read-only (/R /F /T /Q), matching bash's treatment of `which`
-    // in BashTool READONLY_COMMANDS.
+    // in ShellCommandTool READONLY_COMMANDS.
     'where.exe': {
       allowAllFlags: true,
     },
@@ -1011,7 +1011,7 @@ export function resolveToCanonical(name: string): string {
  * Any compound containing one of these cannot have its later statements'
  * relative/drive-prefixed paths validated against the stale validator cwd.
  *
- * Name kept for BashTool parity (isCwdChangingCmdlet ↔ compoundCommandHasCd);
+ * Name kept for ShellCommandTool parity (isCwdChangingCmdlet ↔ compoundCommandHasCd);
  * semantically this is "alters path-resolution namespace".
  */
 export function isCwdChangingCmdlet(name: string): boolean {
@@ -1103,7 +1103,7 @@ function lookupAllowlist(name: string): CommandConfig | undefined {
 /**
  * Sync regex-based check for security-concerning patterns in a PowerShell command.
  * Used by isReadOnly (which must be sync) as a fast pre-filter before the
- * cmdlet allowlist check. This mirrors BashTool's checkReadOnlyConstraints
+ * cmdlet allowlist check. This mirrors ShellCommandTool's checkReadOnlyConstraints
  * which checks bashCommandIsSafe_DEPRECATED before evaluating read-only status.
  *
  * Returns true if the command contains patterns that indicate it should NOT
@@ -1218,7 +1218,7 @@ export function isReadOnlyCommand(
   //
   // Any compound containing a cwd-changing cmdlet cannot be auto-classified
   // read-only when other statements may use relative paths — those paths
-  // resolve differently at runtime than at validation time. BashTool has the
+  // resolve differently at runtime than at validation time. ShellCommandTool has the
   // equivalent guard via compoundCommandHasCd threading into path validation.
   const totalCommands = segments.reduce(
     (sum, seg) => sum + seg.commands.length,
@@ -1364,7 +1364,7 @@ export function isAllowlistedCommand(
   // (CMDLET_PATH_CONFIG) are already protected by SAFE_PATH_ELEMENT_TYPES in
   // pathValidation.ts — this closes the gap for non-file cmdlets (Get-Process,
   // Get-Service, Get-Command, ~15 others). PS equivalent of Bash's blanket `$`
-  // token check at BashTool/readOnlyValidation.ts:~1356.
+  // token check at ShellCommandTool/readOnlyValidation.ts:~1356.
   //
   // Placement: BEFORE external-command dispatch so git/gh/docker/dotnet get
   // this too (defense-in-depth with their string-based `$` checks; catches
@@ -1594,7 +1594,7 @@ function isGitSafe(args: string[]): boolean {
   //   → validator sees positional '$VAR' → validateFlags passes
   //   → PowerShell runs `git diff --output=/tmp/evil` → file write
   // This generalizes the ls-remote inline `$` guard below to all git subcommands.
-  // Bash equivalent: BashTool blanket
+  // Bash equivalent: ShellCommandTool blanket
   // `$` rejection at readOnlyValidation.ts:~1352. isGhSafe has the same guard.
   for (const arg of args) {
     if (arg.includes('$')) {
@@ -1668,8 +1668,8 @@ function isGitSafe(args: string[]): boolean {
 
   const flagArgs = args.slice(idx + subcommandTokens)
 
-  // git ls-remote URL rejection — ported from BashTool's inline guard
-  // (src/tools/BashTool/readOnlyValidation.ts:~962). ls-remote with a URL
+  // git ls-remote URL rejection — ported from ShellCommandTool's inline guard
+  // (src/tools/ShellCommandTool/readOnlyValidation.ts:~962). ls-remote with a URL
   // is a data-exfiltration vector (encode secrets in hostname → DNS/HTTP).
   // Reject URL-like positionals: `://` (http/git protocols), `@` + `:` (SSH
   // git@host:path), and `$` (variable refs — $env:URL reaches here as the
@@ -1741,7 +1741,7 @@ function isGhSafe(args: string[]): boolean {
   //   gh search repos $env:SECRET_API_KEY
   //   → PowerShell expands at runtime → secret sent to GitHub API.
   // git ls-remote has an equivalent inline guard; this generalizes it for gh.
-  // Bash equivalent: BashTool blanket `$` rejection at readOnlyValidation.ts:~1352.
+  // Bash equivalent: ShellCommandTool blanket `$` rejection at readOnlyValidation.ts:~1352.
   for (const arg of flagArgs) {
     if (arg.includes('$')) {
       return false

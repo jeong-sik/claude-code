@@ -33,19 +33,35 @@ import { getTaskOutputPath } from '../../utils/task/diskOutput.js';
 import { TaskOutput } from '../../utils/task/TaskOutput.js';
 import { isOutputLineTruncated } from '../../utils/terminal.js';
 import { buildLargeToolResultMessage, ensureToolResultsDir, generatePreview, getToolResultPath, PREVIEW_SIZE_BYTES } from '../../utils/toolResultStorage.js';
-import { shouldUseSandbox } from '../BashTool/shouldUseSandbox.js';
-import { BackgroundHint } from '../BashTool/UI.js';
-import { buildImageToolResult, isImageOutput, resetCwdIfOutsideProject, resizeShellImageOutput, stdErrAppendShellResetMessage, stripEmptyLines } from '../BashTool/utils.js';
+import { shouldUseSandbox } from '../ShellCommandTool/shouldUseSandbox.js';
+import { BackgroundHint } from '../ShellCommandTool/UI.js';
+import { buildImageToolResult, isImageOutput, resetCwdIfOutsideProject, resizeShellImageOutput, stdErrAppendShellResetMessage, stripEmptyLines } from '../ShellCommandTool/utils.js';
 import { trackGitOperations } from '../shared/gitOperationTracking.js';
 import { interpretCommandResult } from './commandSemantics.js';
 import { powershellToolHasPermission } from './powershellPermissions.js';
 import { getDefaultTimeoutMs, getMaxTimeoutMs, getPrompt } from './prompt.js';
+import { evaluateGate } from '../ShellCommandTool/gate.js';
+import type { RiskClass, ShellIrMode } from '../ShellCommandTool/types.js';
+import { classifyPowerShellRisk, isReadOperation, isDestructive as isDestructiveRisk } from './risk.js';
 import { hasSyncSecurityConcerns, isReadOnlyCommand, resolveToCanonical } from './readOnlyValidation.js';
 import { POWERSHELL_TOOL_NAME } from './toolName.js';
 import { renderToolResultMessage, renderToolUseErrorMessage, renderToolUseMessage, renderToolUseProgressMessage, renderToolUseQueuedMessage } from './UI.js';
 
 // Never use os.EOL for terminal output — \r\n on Windows breaks Ink rendering
 const EOL = '\n';
+
+/**
+ * Extract the canonical cmdlet name from a PowerShell command string.
+ * Strips common prefixes (module qualifiers like `Module\Cmdlet`) and
+ * normalizes to lowercase.
+ */
+function extractCmdlet(command: string): string {
+  const firstWord = command.trim().split(/\s+/)[0] ?? '';
+  if (!firstWord) return '';
+  // Strip module qualifier: `ActiveDirectory\Get-ADUser` → `get-aduser`
+  const withoutModule = firstWord.replace(/^.*\\/, '');
+  return withoutModule.toLowerCase();
+}
 
 /**
  * PowerShell search commands (grep equivalents) for collapsible display.
@@ -181,7 +197,7 @@ function isAutobackgroundingAllowed(command: string): boolean {
 }
 
 /**
- * PS-flavored port of BashTool's detectBlockedSleepPattern.
+ * PS-flavored port of ShellCommandTool's detectBlockedSleepPattern.
  * Catches `Start-Sleep N`, `Start-Sleep -Seconds N`, `sleep N` (built-in alias)
  * as the first statement. Does NOT block `Start-Sleep -Milliseconds` (sub-second
  * pacing is fine) or float seconds (legit rate limiting).
@@ -190,7 +206,7 @@ export function detectBlockedSleepPattern(command: string): string | null {
   // First statement only — split on PS statement separators: `;`, `|`,
   // `&`/`&&`/`||` (pwsh 7+), and newline (PS's primary separator). This is
   // intentionally shallow — sleep inside script blocks, subshells, or later
-  // pipeline stages is fine. Matches BashTool's splitCommandWithOperators
+  // pipeline stages is fine. Matches ShellCommandTool's splitCommandWithOperators
   // intent (src/utils/bash/commands.ts) without a full PS parser.
   const first = command.trim().split(/[;|&\r\n]/)[0]?.trim() ?? '';
   // Match: Start-Sleep N, Start-Sleep -Seconds N, Start-Sleep -s N, sleep N
@@ -252,7 +268,11 @@ const outputSchema = lazySchema(() => z.object({
   persistedOutputSize: z.number().optional().describe('Total output size in bytes when persisted'),
   backgroundTaskId: z.string().optional().describe('ID of the background task if command is running in background'),
   backgroundedByUser: z.boolean().optional().describe('True if the user manually backgrounded the command with Ctrl+B'),
-  assistantAutoBackgrounded: z.boolean().optional().describe('True if the command was auto-backgrounded by the assistant-mode blocking budget')
+  assistantAutoBackgrounded: z.boolean().optional().describe('True if the command was auto-backgrounded by the assistant-mode blocking budget'),
+  risk_class: z.string().optional().describe('Risk classification: R0_Read, R1_Reversible_mutation, R2_Irreversible, or Destructive_protected'),
+  is_read_operation: z.boolean().optional().describe('Whether the command is classified as a read-only operation'),
+  is_destructive: z.boolean().optional().describe('Whether the command is classified as destructive'),
+  stage_words: z.array(z.string()).optional().describe('Tokenized command words for audit and classification')
 }));
 type OutputSchema = ReturnType<typeof outputSchema>;
 export type Out = z.infer<OutputSchema>;
@@ -298,21 +318,23 @@ export const PowerShellTool = buildTool({
     return isSearchOrReadPowerShellCommand(input.command);
   },
   isReadOnly(input: PowerShellToolInput): boolean {
-    // Check sync security heuristics before declaring read-only.
-    // The full AST parse is async and unavailable here, so we use
-    // regex-based detection of subexpressions, splatting, member
-    // invocations, and assignments — matching BashTool's pattern of
-    // checking security concerns before cmdlet allowlist evaluation.
+    // Defense: sync security heuristics block read-only claims for
+    // subexpressions, splatting, member invocations, and assignments.
     if (hasSyncSecurityConcerns(input.command)) {
       return false;
     }
-    // NOTE: This calls isReadOnlyCommand without the parsed AST. Without the
-    // AST, isReadOnlyCommand cannot split pipelines/statements and will return
-    // false for anything but the simplest single-token commands. This is a
-    // known limitation of the sync Tool.isReadOnly() interface — the real
-    // read-only auto-allow happens async in powershellToolHasPermission (step
-    // 4.5) where the parsed AST is available.
-    return isReadOnlyCommand(input.command);
+    // RiskClass-based classification: same taxonomy as ShellCommandTool.
+    const cmdlet = extractCmdlet(input.command);
+    const words = input.command.trim().split(/\s+/);
+    const riskClass = classifyPowerShellRisk(cmdlet, words);
+    return isReadOperation(riskClass);
+  },
+
+  isDestructive(input: PowerShellToolInput): boolean {
+    const cmdlet = extractCmdlet(input.command);
+    const words = input.command.trim().split(/\s+/);
+    const riskClass = classifyPowerShellRisk(cmdlet, words);
+    return isDestructiveRisk(riskClass);
   },
   toAutoClassifierInput(input) {
     return input.command;
@@ -373,6 +395,33 @@ export const PowerShellTool = buildTool({
     };
   },
   async checkPermissions(input: PowerShellToolInput, context: Parameters<Tool['checkPermissions']>[1]): Promise<PermissionResult> {
+    // Coarse-grained RiskClass gate — layered on top of the fine-grained
+    // powershellToolHasPermission rule system. The RiskClass gate is
+    // fail-closed: if it says 'deny' or 'ask', we return immediately.
+    // If it says 'allow', we delegate to the finer-grained rules.
+    const cmdlet = extractCmdlet(input.command);
+    const words = input.command.trim().split(/\s+/);
+    const riskClass: RiskClass = classifyPowerShellRisk(cmdlet, words);
+    const mode: ShellIrMode = 'strict';
+    const isInSandbox = SandboxManager.isSandboxingEnabled();
+    const verdict = evaluateGate(riskClass, mode, isInSandbox);
+
+    if (verdict.behavior === 'deny') {
+      return {
+        behavior: 'deny',
+        updatedInput: input,
+        message: verdict.reason,
+      };
+    }
+    if (verdict.behavior === 'ask') {
+      return {
+        behavior: 'ask',
+        updatedInput: input,
+        message: verdict.reason,
+      };
+    }
+
+    // RiskClass gate allows — delegate to fine-grained PowerShell rules
     return await powershellToolHasPermission(input, context);
   },
   renderToolUseMessage,
@@ -389,7 +438,11 @@ export const PowerShellTool = buildTool({
     persistedOutputSize,
     backgroundTaskId,
     backgroundedByUser,
-    assistantAutoBackgrounded
+    assistantAutoBackgrounded,
+    risk_class,
+    is_read_operation,
+    is_destructive,
+    stage_words
   }: Out, toolUseID: string): ToolResultBlockParam {
     // For image data, format as image content block for Claude
     if (isImage) {
@@ -427,17 +480,33 @@ export const PowerShellTool = buildTool({
         backgroundInfo = `Command running in background with ID: ${backgroundTaskId}. Output is being written to: ${outputPath}`;
       }
     }
+    // Structured RiskClass metadata — same taxonomy as ShellCommandTool
+    const riskMeta: string[] = [];
+    if (risk_class) {
+      riskMeta.push(`[risk_class: ${risk_class}]`);
+    }
+    if (is_read_operation !== undefined) {
+      riskMeta.push(`[is_read: ${is_read_operation}]`);
+    }
+    if (is_destructive !== undefined) {
+      riskMeta.push(`[is_destructive: ${is_destructive}]`);
+    }
+    if (stage_words && stage_words.length > 0) {
+      riskMeta.push(`[stage_words: ${stage_words.join(' ')}]`);
+    }
+    const metaLine = riskMeta.join(' ');
+
     return {
       tool_use_id: toolUseID,
       type: 'tool_result' as const,
-      content: [processedStdout, errorMessage, backgroundInfo].filter(Boolean).join('\n'),
+      content: [metaLine, processedStdout, errorMessage, backgroundInfo].filter(Boolean).join('\n'),
       is_error: interrupted
     };
   },
   async call(input: PowerShellToolInput, toolUseContext: Parameters<Tool['call']>[1], _canUseTool?: CanUseToolFn, _parentMessage?: AssistantMessage, onProgress?: ToolCallProgress<PowerShellProgress>): Promise<{
     data: Out;
   }> {
-    // Load-bearing guard: promptShellExecution.ts and processBashCommand.tsx
+    // Load-bearing guard: promptShellExecution.ts and processShellCommand.tsx
     // call PowerShellTool.call() directly, bypassing validateInput. This is
     // the check that covers ALL callers. See isWindowsSandboxPolicyViolation
     // comment for the policy rationale.
@@ -451,6 +520,14 @@ export const PowerShellTool = buildTool({
     } = toolUseContext;
     const isMainThread = !toolUseContext.agentId;
     let progressCounter = 0;
+
+    // RiskClass classification — same taxonomy as ShellCommandTool
+    const cmdlet = extractCmdlet(input.command);
+    const words = input.command.trim().split(/\s+/);
+    const riskClass: RiskClass = classifyPowerShellRisk(cmdlet, words);
+    const _isReadOperation = isReadOperation(riskClass);
+    const _isDestructive = isDestructiveRisk(riskClass);
+
     try {
       const commandGenerator = runPowerShellCommand({
         input,
@@ -486,18 +563,18 @@ export const PowerShellTool = buildTool({
       } while (!generatorResult.done);
       const result = generatorResult.value;
 
-      // Feed git/PR usage metrics (same counters as BashTool). PS invokes
+      // Feed git/PR usage metrics (same counters as ShellCommandTool). PS invokes
       // git/gh/glab/curl as external binaries with identical syntax, so the
       // shell-agnostic regex detection in trackGitOperations works as-is.
       // Called before the backgroundTaskId early-return so backgrounded
-      // commands are counted too (matches BashTool.tsx:912).
+      // commands are counted too (matches ShellCommandTool.tsx:912).
       //
       // Pre-flight sentinel guard: the two PS pre-flight paths (pwsh-not-found,
       // exec-spawn-catch) return code: 0 + empty stdout + stderr so call() can
       // surface stderr gracefully instead of throwing ShellError. But
       // gitOperationTracking.ts:48 treats code 0 as success and would
       // regex-match the command, mis-counting a command that never ran.
-      // BashTool is safe — its pre-flight goes through createFailedCommand
+      // ShellCommandTool is safe — its pre-flight goes through createFailedCommand
       // (code: 1) so tracking early-returns. Skip tracking on this sentinel.
       const isPreFlightSentinel = result.code === 0 && !result.stdout && result.stderr && !result.backgroundTaskId;
       if (!isPreFlightSentinel) {
@@ -507,14 +584,14 @@ export const PowerShellTool = buildTool({
       // Distinguish user-driven interrupt (new message submitted) from other
       // interrupted states. Only user-interrupt should suppress ShellError —
       // timeout-kill or process-kill with isError should still throw.
-      // Matches BashTool's isInterrupt.
+      // Matches ShellCommandTool's isInterrupt.
       const isInterrupt = result.interrupted && abortController.signal.reason === 'interrupt';
 
       // Only the main thread tracks/resets cwd; agents have their own cwd
-      // isolation. Matches BashTool's !preventCwdChanges guard.
+      // isolation. Matches ShellCommandTool's !preventCwdChanges guard.
       // Runs before the backgroundTaskId early-return: a command may change
       // CWD before being backgrounded (e.g. `Set-Location C:\temp;
-      // Start-Sleep 60`), and BashTool has no such early return — its
+      // Start-Sleep 60`), and ShellCommandTool has no such early return — its
       // backgrounded results flow through resetCwdIfOutsideProject at :945.
       let stderrForShellReset = '';
       if (isMainThread) {
@@ -526,7 +603,7 @@ export const PowerShellTool = buildTool({
 
       // If backgrounded, return immediately with task ID. Strip hints first
       // so interrupt-backgrounded fullOutput doesn't leak the tag to the
-      // model (BashTool has no early return, so all paths flow through its
+      // model (ShellCommandTool has no early return, so all paths flow through its
       // single extraction site).
       if (result.backgroundTaskId) {
         const bgExtracted = extractClaudeCodeHints(result.stdout || '', input.command);
@@ -540,7 +617,11 @@ export const PowerShellTool = buildTool({
             interrupted: false,
             backgroundTaskId: result.backgroundTaskId,
             backgroundedByUser: result.backgroundedByUser,
-            assistantAutoBackgrounded: result.assistantAutoBackgrounded
+            assistantAutoBackgrounded: result.assistantAutoBackgrounded,
+            risk_class: riskClass,
+            is_read_operation: _isReadOperation,
+            is_destructive: _isDestructive,
+            stage_words: words
           }
         };
       }
@@ -556,7 +637,7 @@ export const PowerShellTool = buildTool({
 
       // getErrorParts() in toolErrors.ts already prepends 'Exit code N'
       // from error.code when building the ShellError message. Do not
-      // duplicate it into stdout here (BashTool's append at :939 is dead
+      // duplicate it into stdout here (ShellCommandTool's append at :939 is dead
       // code — it throws before stdoutAccumulator.toString() is read).
 
       let stdout = stripEmptyLines(stdoutAccumulator.toString());
@@ -576,7 +657,7 @@ export const PowerShellTool = buildTool({
       // preSpawnError means exec() succeeded but the inner shell failed before
       // the command ran (e.g. CWD deleted). createFailedCommand sets code=1,
       // which interpretCommandResult can mistake for grep-no-match / findstr
-      // string-not-found. Throw it directly. Matches BashTool.tsx:957.
+      // string-not-found. Throw it directly. Matches ShellCommandTool.tsx:957.
       if (result.preSpawnError) {
         throw new Error(result.preSpawnError);
       }
@@ -587,9 +668,9 @@ export const PowerShellTool = buildTool({
       // Large output: file on disk has more than getMaxOutputLength() bytes.
       // stdout already contains the first chunk. Copy the output file to the
       // tool-results dir so the model can read it via FileRead. If > 64 MB,
-      // truncate after copying. Matches BashTool.tsx:983-1005.
+      // truncate after copying. Matches ShellCommandTool.tsx:983-1005.
       //
-      // Placed AFTER the preSpawnError/ShellError throws (matches BashTool's
+      // Placed AFTER the preSpawnError/ShellError throws (matches ShellCommandTool's
       // ordering, where persistence is post-try/finally): a failing command
       // that also produced >maxOutputLength bytes would otherwise do 3-4 disk
       // syscalls, store to tool-results/, then throw — orphaning the file.
@@ -649,7 +730,11 @@ export const PowerShellTool = buildTool({
           returnCodeInterpretation: interpretation.message,
           isImage,
           persistedOutputPath,
-          persistedOutputSize
+          persistedOutputSize,
+          risk_class: riskClass,
+          is_read_operation: _isReadOperation,
+          is_destructive: _isDestructive,
+          stage_words: words
         }
       };
     } finally {
@@ -706,7 +791,7 @@ async function* runPowerShellCommand({
 
   // Progress signal: resolved when backgroundShellId is set in the async
   // .then() path, waking the generator's Promise.race immediately instead of
-  // waiting for the next setTimeout tick (matches BashTool pattern).
+  // waiting for the next setTimeout tick (matches ShellCommandTool pattern).
   let resolveProgress: (() => void) | null = null;
   function createProgressSignal(): Promise<null> {
     return new Promise<null>(resolve => {
@@ -805,7 +890,7 @@ async function* runPowerShellCommand({
 
       // Wake the generator's Promise.race so it sees backgroundShellId.
       // Without this, the generator waits for the current setTimeout to fire
-      // (up to ~1s) before noticing the backgrounding. Matches BashTool.
+      // (up to ~1s) before noticing the backgrounding. Matches ShellCommandTool.
       const resolve = resolveProgress;
       if (resolve) {
         resolveProgress = null;
@@ -866,7 +951,7 @@ async function* runPowerShellCommand({
 
   // Progress loop: wrap in try/finally so stopPolling is called on every exit
   // path — normal completion, timeout/interrupt backgrounding, and Ctrl+B
-  // (matches BashTool pattern; see PR #18887 review thread at :560)
+  // (matches ShellCommandTool pattern; see PR #18887 review thread at :560)
   try {
     while (true) {
       const now = Date.now();
@@ -902,7 +987,7 @@ async function* runPowerShellCommand({
           // Command completed — cleanup stream listeners here. The finally
           // block's guard (!backgroundShellId && status !== 'backgrounded')
           // correctly skips cleanup for *running* backgrounded tasks, but
-          // in this race the process is done. Matches BashTool.tsx:1399.
+          // in this race the process is done. Matches ShellCommandTool.tsx:1399.
           shellCommand.cleanup();
           return fixedResult;
         }

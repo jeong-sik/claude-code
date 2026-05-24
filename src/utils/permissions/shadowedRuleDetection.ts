@@ -1,5 +1,5 @@
 import type { ToolPermissionContext } from '../../Tool.js'
-import { BASH_TOOL_NAME } from '../../tools/BashTool/toolName.js'
+import { SHELL_COMMAND_TOOL_NAME } from '../../tools/ShellCommandTool/toolName.js'
 import type { PermissionRule, PermissionRuleSource } from './PermissionRule.js'
 import {
   getAllowRules,
@@ -136,7 +136,7 @@ function isAllowRuleShadowedByAskRule(
   // The sandbox exception is based on the ASK rule's source, not the allow rule's source.
   // If the ask rule is from personal settings, the user's own sandbox will auto-allow.
   // If the ask rule is from shared settings, other team members may not have sandbox enabled.
-  if (toolName === BASH_TOOL_NAME && options.sandboxAutoAllowEnabled) {
+  if (toolName === SHELL_COMMAND_TOOL_NAME && options.sandboxAutoAllowEnabled) {
     if (!isSharedSettingSource(shadowingAskRule.source)) {
       return { shadowed: false }
     }

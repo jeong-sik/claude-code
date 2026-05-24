@@ -17,7 +17,7 @@ import {
 } from 'src/services/analytics/index.js'
 import { prefetchAllMcpResources } from 'src/services/mcp/client.js'
 import type { ScopedMcpServerConfig } from 'src/services/mcp/types.js'
-import { BashTool } from 'src/tools/BashTool/BashTool.js'
+import { ShellCommandTool } from 'src/tools/ShellCommandTool/ShellCommandTool.js'
 import { FileEditTool } from 'src/tools/FileEditTool/FileEditTool.js'
 import {
   normalizeFileEditInput,
@@ -578,9 +578,9 @@ export function normalizeToolInput<T extends Tool>(
       void persistFileSnapshotIfRemote()
       return plan !== null ? { ...input, plan, planFilePath } : input
     }
-    case BashTool.name: {
+    case ShellCommandTool.name: {
       // Validated upstream, won't throw
-      const parsed = BashTool.inputSchema.parse(input)
+      const parsed = ShellCommandTool.inputSchema.parse(input)
       const { command, timeout, description } = parsed
       const cwd = getCwd()
       let normalizedCommand = command.replace(`cd ${cwd} && `, '')
@@ -596,7 +596,7 @@ export function normalizeToolInput<T extends Tool>(
 
       // Logging for commands that are only echoing a string. This is to help us understand how often  Claude talks via bash
       if (/^echo\s+["']?[^|&;><]*["']?$/i.test(normalizedCommand.trim())) {
-        logEvent('tengu_bash_tool_simple_echo', {})
+        logEvent('tengu_shell_tool_simple_echo', {})
       }
 
       // Check for run_in_background (may not exist in schema if CLAUDE_CODE_DISABLE_BACKGROUND_TASKS is set)
@@ -613,10 +613,6 @@ export function normalizeToolInput<T extends Tool>(
         ...(timeout !== undefined && { timeout }),
         ...(description !== undefined && { description }),
         ...(run_in_background !== undefined && { run_in_background }),
-        ...('dangerouslyDisableSandbox' in parsed &&
-          parsed.dangerouslyDisableSandbox !== undefined && {
-            dangerouslyDisableSandbox: parsed.dangerouslyDisableSandbox,
-          }),
       } as z.infer<T['inputSchema']>
     }
     case FileEditTool.name: {
@@ -635,7 +631,7 @@ export function normalizeToolInput<T extends Tool>(
         ],
       })
 
-      // SAFETY: See comment in BashTool case above
+      // SAFETY: See comment in ShellCommandTool case above
       return {
         replace_all: edits[0]!.replace_all,
         file_path,
@@ -650,7 +646,7 @@ export function normalizeToolInput<T extends Tool>(
       // Markdown uses two trailing spaces as a hard line break — don't strip.
       const isMarkdown = /\.(md|mdx)$/i.test(parsedInput.file_path)
 
-      // SAFETY: See comment in BashTool case above
+      // SAFETY: See comment in ShellCommandTool case above
       return {
         file_path: parsedInput.file_path,
         content: isMarkdown
@@ -668,7 +664,7 @@ export function normalizeToolInput<T extends Tool>(
         (typeof legacyInput.wait_up_to === 'number'
           ? legacyInput.wait_up_to * 1000
           : undefined)
-      // SAFETY: See comment in BashTool case above
+      // SAFETY: See comment in ShellCommandTool case above
       return {
         task_id: taskId ?? '',
         block: legacyInput.block ?? true,

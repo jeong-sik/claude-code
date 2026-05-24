@@ -6,7 +6,7 @@ import { isMcpTool } from 'src/services/mcp/utils.js';
 import type { Tool, Tools } from 'src/Tool.js';
 import { filterToolsForAgent } from 'src/tools/AgentTool/agentToolUtils.js';
 import { AGENT_TOOL_NAME } from 'src/tools/AgentTool/constants.js';
-import { BashTool } from 'src/tools/BashTool/BashTool.js';
+import { ShellCommandTool } from 'src/tools/ShellCommandTool/ShellCommandTool.js';
 import { ExitPlanModeV2Tool } from 'src/tools/ExitPlanModeTool/ExitPlanModeV2Tool.js';
 import { FileEditTool } from 'src/tools/FileEditTool/FileEditTool.js';
 import { FileReadTool } from 'src/tools/FileReadTool/FileReadTool.js';
@@ -58,7 +58,7 @@ function getToolBuckets(): ToolBuckets {
     },
     EXECUTION: {
       name: 'Execution tools',
-      toolNames: new Set([BashTool.name, "external" === 'ant' ? TungstenTool.name : undefined].filter(n => n !== undefined))
+      toolNames: new Set([ShellCommandTool.name, "external" === 'ant' ? TungstenTool.name : undefined].filter(n => n !== undefined))
     },
     MCP: {
       name: 'MCP tools',

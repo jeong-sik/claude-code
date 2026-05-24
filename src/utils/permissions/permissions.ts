@@ -7,8 +7,8 @@ import {
 } from '../../services/mcp/mcpStringUtils.js'
 import type { Tool, ToolPermissionContext, ToolUseContext } from '../../Tool.js'
 import { AGENT_TOOL_NAME } from '../../tools/AgentTool/constants.js'
-import { shouldUseSandbox } from '../../tools/BashTool/shouldUseSandbox.js'
-import { BASH_TOOL_NAME } from '../../tools/BashTool/toolName.js'
+import { shouldUseSandbox } from '../../tools/ShellCommandTool/shouldUseSandbox.js'
+import { SHELL_COMMAND_TOOL_NAME } from '../../tools/ShellCommandTool/toolName.js'
 import { POWERSHELL_TOOL_NAME } from '../../tools/PowerShellTool/toolName.js'
 import { REPL_TOOL_NAME } from '../../tools/REPLTool/constants.js'
 import type { AssistantMessage } from '../../types/message.js'
@@ -232,7 +232,7 @@ export function getAskRules(context: ToolPermissionContext): PermissionRule[] {
 
 /**
  * Check if the entire tool matches a rule
- * For example, this matches "Bash" but not "Bash(prefix:*)" for BashTool
+ * For example, this matches "Bash" but not "Bash(prefix:*)" for ShellCommandTool
  * This also matches MCP tools with a server name, e.g. the rule "mcp__server1"
  */
 function toolMatchesRule(
@@ -270,7 +270,7 @@ function toolMatchesRule(
 
 /**
  * Check if the entire tool is listed in the always allow rules
- * For example, this finds "Bash" but not "Bash(prefix:*)" for BashTool
+ * For example, this finds "Bash" but not "Bash(prefix:*)" for ShellCommandTool
  */
 export function toolAlwaysAllowedRule(
   context: ToolPermissionContext,
@@ -344,7 +344,7 @@ export function filterDeniedAgents<T extends { agentType: string }>(
 
 /**
  * Map of rule contents to the associated rule for a given tool.
- * e.g. the string key is "prefix:*" from "Bash(prefix:*)" for BashTool
+ * e.g. the string key is "prefix:*" from "Bash(prefix:*)" for ShellCommandTool
  */
 export function getRuleByContentsForTool(
   context: ToolPermissionContext,
@@ -1092,7 +1092,7 @@ export async function checkRuleBasedPermissions(
   const askRule = getAskRuleForTool(appState.toolPermissionContext, tool)
   if (askRule) {
     const canSandboxAutoAllow =
-      tool.name === BASH_TOOL_NAME &&
+      tool.name === SHELL_COMMAND_TOOL_NAME &&
       SandboxManager.isSandboxingEnabled() &&
       SandboxManager.isAutoAllowBashIfSandboxedEnabled() &&
       shouldUseSandbox(input)
@@ -1187,7 +1187,7 @@ async function hasPermissionsToUseToolInner(
     // auto-allow via Bash's checkPermissions. Commands that won't be sandboxed (excluded
     // commands, dangerouslyDisableSandbox) still need to respect the ask rule.
     const canSandboxAutoAllow =
-      tool.name === BASH_TOOL_NAME &&
+      tool.name === SHELL_COMMAND_TOOL_NAME &&
       SandboxManager.isSandboxingEnabled() &&
       SandboxManager.isAutoAllowBashIfSandboxedEnabled() &&
       shouldUseSandbox(input)

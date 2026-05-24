@@ -165,7 +165,7 @@ type PowerShellInput = {
 /**
  * Filter rules by contents matching an input command.
  * PowerShell-specific: uses case-insensitive matching throughout.
- * Follows the same structure as BashTool's local filterRulesByContentsMatchingInput.
+ * Follows the same structure as ShellCommandTool's local filterRulesByContentsMatchingInput.
  */
 function filterRulesByContentsMatchingInput(
   input: PowerShellInput,
@@ -730,7 +730,7 @@ export async function powershellToolHasPermission(
   // (L917); without this guard, parse-failed was inconsistent.
   // This ensures user-configured exact allow rules work even when pwsh is
   // unavailable. When parsing succeeds, the exact allow check is deferred to
-  // after step 4.4 (sub-command deny/ask) — matching BashTool's ordering where
+  // after step 4.4 (sub-command deny/ask) — matching ShellCommandTool's ordering where
   // the main-flow exact allow at bashPermissions.ts:1520 runs after sub-command
   // deny checks (1442-1458). Without this, an exact allow on a compound command
   // would bypass deny rules on sub-commands.
@@ -1109,7 +1109,7 @@ export async function powershellToolHasPermission(
   // Decision: cd+git compound guard — was step 4.42 (:805-833).
   // When cd/Set-Location is paired with git, don't allow without prompting —
   // cd to a malicious directory makes git dangerous (fake hooks, bare repo
-  // attacks). Collect-then-reduce keeps the improvement over BashTool: in
+  // attacks). Collect-then-reduce keeps the improvement over ShellCommandTool: in
   // bash, cd+git (B9, line 1416) runs BEFORE sub-command deny (B11), so cd+git
   // ask masks deny. Here, both are in the same decision array; deny wins.
   //
@@ -1148,7 +1148,7 @@ export async function powershellToolHasPermission(
   // Previously this block pushed 'ask' when hasCdSubCommand && hasAcceptEditsWrite,
   // but checkPathConstraints now receives hasCdSubCommand and pushes 'ask' for ANY
   // path operation (read or write) in a cd-compound — broader coverage at the path
-  // layer (BashTool parity). The step-5 !hasCdSubCommand gates and modeValidation's
+  // layer (ShellCommandTool parity). The step-5 !hasCdSubCommand gates and modeValidation's
   // compound-cd guard remain as defense-in-depth for paths that don't reach
   // checkPathConstraints (e.g., cmdlets not in CMDLET_PATH_CONFIG).
 
@@ -1156,7 +1156,7 @@ export async function powershellToolHasPermission(
   // If cwd has HEAD/objects/refs/ without a valid .git/HEAD, Git treats
   // cwd as a bare repository and runs hooks from cwd. Attacker creates
   // hooks/pre-commit, deletes .git/HEAD, then any git subcommand runs it.
-  // Port of BashTool readOnlyValidation.ts isCurrentDirectoryBareGitRepo.
+  // Port of ShellCommandTool readOnlyValidation.ts isCurrentDirectoryBareGitRepo.
   if (hasGitSubCommand && isCurrentDirectoryBareGitRepo()) {
     decisions.push({
       behavior: 'ask',
@@ -1169,7 +1169,7 @@ export async function powershellToolHasPermission(
   // Compound command creates HEAD/objects/refs/hooks/ then runs git → the
   // git subcommand executes freshly-created malicious hooks. Check all
   // extracted write paths + redirection targets against git-internal patterns.
-  // Port of BashTool commandWritesToGitInternalPaths, adapted for AST.
+  // Port of ShellCommandTool commandWritesToGitInternalPaths, adapted for AST.
   if (hasGitSubCommand) {
     const writesToGitInternal = allSubCommands.some(
       ({ element, statement }) => {
@@ -1262,7 +1262,7 @@ export async function powershellToolHasPermission(
   // lines ~994, 1088, 1160, 1210), 'ask' for paths outside working dirs, or
   // 'passthrough'.
   //
-  // Thread hasCdSubCommand (BashTool compoundCommandHasCd parity): when the
+  // Thread hasCdSubCommand (ShellCommandTool compoundCommandHasCd parity): when the
   // compound contains a cwd-changing cmdlet, checkPathConstraints forces 'ask'
   // for any statement with path operations — relative paths resolve against the
   // stale validator cwd, not PowerShell's runtime cwd. This is the architectural
@@ -1279,7 +1279,7 @@ export async function powershellToolHasPermission(
   }
 
   // Decision: exact allow (parse-succeeded case) — was step 4.45 (:861-867).
-  // Matches BashTool ordering: sub-command deny → path constraints → exact
+  // Matches ShellCommandTool ordering: sub-command deny → path constraints → exact
   // allow. Reduce enforces deny > ask > allow, so the exact allow only
   // surfaces when no deny or ask fired — same as sequential.
   //
@@ -1530,7 +1530,7 @@ export async function powershellToolHasPermission(
       continue
     }
 
-    // Check per-sub-command acceptEdits mode (BashTool parity).
+    // Check per-sub-command acceptEdits mode (ShellCommandTool parity).
     // Delegate to checkPermissionMode on a single-statement AST so that ALL
     // of its guards apply: expression pipeline sources (non-CommandAst elements),
     // security flags (subexpressions, script blocks, assignments, splatting, etc.),
@@ -1550,7 +1550,7 @@ export async function powershellToolHasPermission(
     // pass: Set-Content is checked in isolation, matches ACCEPT_EDITS_ALLOWED_CMDLETS,
     // and auto-allows — but PowerShell runs it from the changed cwd, writing to
     // .claude/settings.json (a Claude config file the path validator didn't check).
-    // This matches BashTool's compoundCommandHasCd guard.
+    // This matches ShellCommandTool's compoundCommandHasCd guard.
     if (statement !== null && !hasCdSubCommand && !hasSymlinkCreate) {
       const subModeResult = checkPermissionMode(
         { command: subCmd },
