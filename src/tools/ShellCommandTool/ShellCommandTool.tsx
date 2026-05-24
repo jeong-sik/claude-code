@@ -20,6 +20,7 @@ import type { AssistantMessage } from '../../types/message.js'
 import type { PermissionResult } from '../../utils/permissions/PermissionResult.js'
 import { exec } from '../../utils/Shell.js'
 import type { ExecResult } from '../../utils/ShellCommand.js'
+import { SandboxManager } from '../../utils/sandbox/sandbox-adapter.js'
 import { parseToShellIr } from './parser.js'
 import { classifyShellIr, isReadOperation, isDestructive } from './risk.js'
 import { evaluateGate } from './gate.js'
@@ -228,7 +229,7 @@ Use this tool when you need to run shell commands. Prefer it over Bash for comma
     }
 
     const mode: ShellIrMode = input.mode ?? 'strict'
-    const isInSandbox = false // TODO: wire sandbox detection from context
+    const isInSandbox = SandboxManager.isSandboxingEnabled()
     const verdict = evaluateGate(classified.riskClass, mode, isInSandbox)
 
     switch (verdict.behavior) {

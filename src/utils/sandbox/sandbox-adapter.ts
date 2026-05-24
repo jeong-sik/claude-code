@@ -49,7 +49,7 @@ import type { SettingsJson } from '../settings/types.js'
 // Settings Converter
 // ============================================================================
 
-import { BASH_TOOL_NAME } from 'src/tools/BashTool/toolName.js'
+import { SHELL_COMMAND_TOOL_NAME } from 'src/tools/ShellCommandTool/toolName.js'
 import { FILE_EDIT_TOOL_NAME } from 'src/tools/FileEditTool/constants.js'
 import { FILE_READ_TOOL_NAME } from 'src/tools/FileReadTool/prompt.js'
 import { WEB_FETCH_TOOL_NAME } from 'src/tools/WebFetchTool/prompt.js'
@@ -845,12 +845,12 @@ export function addToExcludedCommands(
     const bashSuggestions = permissionUpdates.filter(
       update =>
         update.type === 'addRules' &&
-        update.rules.some(rule => rule.toolName === BASH_TOOL_NAME),
+        update.rules.some(rule => rule.toolName === SHELL_COMMAND_TOOL_NAME),
     )
 
     if (bashSuggestions.length > 0 && bashSuggestions[0]!.type === 'addRules') {
       const firstBashRule = bashSuggestions[0]!.rules.find(
-        rule => rule.toolName === BASH_TOOL_NAME,
+        rule => rule.toolName === SHELL_COMMAND_TOOL_NAME,
       )
       if (firstBashRule?.ruleContent) {
         // Extract pattern from Bash(command) or Bash(command:*) format
