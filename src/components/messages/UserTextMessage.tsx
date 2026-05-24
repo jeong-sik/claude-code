@@ -9,8 +9,8 @@ import { extractTag, INTERRUPT_MESSAGE, INTERRUPT_MESSAGE_FOR_TOOL_USE } from '.
 import { InterruptedByUser } from '../InterruptedByUser.js';
 import { MessageResponse } from '../MessageResponse.js';
 import { UserAgentNotificationMessage } from './UserAgentNotificationMessage.js';
-import { UserBashInputMessage } from './UserBashInputMessage.js';
-import { UserBashOutputMessage } from './UserBashOutputMessage.js';
+import { UserShellCommandInputMessage } from './UserShellCommandInputMessage.js';
+import { UserShellCommandOutputMessage } from './UserShellCommandOutputMessage.js';
 import { UserCommandMessage } from './UserCommandMessage.js';
 import { UserLocalCommandOutputMessage } from './UserLocalCommandOutputMessage.js';
 import { UserMemoryInputMessage } from './UserMemoryInputMessage.js';
@@ -60,7 +60,7 @@ export function UserTextMessage(t0) {
   if (param.text.startsWith("<bash-stdout") || param.text.startsWith("<bash-stderr")) {
     let t1;
     if ($[3] !== param.text || $[4] !== verbose) {
-      t1 = <UserBashOutputMessage content={param.text} verbose={verbose} />;
+      t1 = <UserShellCommandOutputMessage content={param.text} verbose={verbose} />;
       $[3] = param.text;
       $[4] = verbose;
       $[5] = t1;
@@ -117,7 +117,7 @@ export function UserTextMessage(t0) {
   if (param.text.includes("<bash-input>")) {
     let t1;
     if ($[13] !== addMargin || $[14] !== param) {
-      t1 = <UserBashInputMessage addMargin={addMargin} param={param} />;
+      t1 = <UserShellCommandInputMessage addMargin={addMargin} param={param} />;
       $[13] = addMargin;
       $[14] = param;
       $[15] = t1;

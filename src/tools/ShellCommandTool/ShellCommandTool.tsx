@@ -1,7 +1,7 @@
 /**
  * ShellCommandTool — Shell IR 기반 고급 셸 실행 도구.
  *
- * BashTool의 typed, risk-classified 상위 호환체.
+ * Typed IR 기반 셸 실행 도구. RiskClass 분류와 phantom-type branding을 지원.
  * 모든 입력은 tree-sitter 파싱 → Shell IR → RiskClass 분류를 거친다.
  * 출력에 structured metadata(risk_class, stage_words, is_read_operation,
  * is_destructive)를 포함하여 모델이 명령의 위험도를 인지할 수 있게 한다.
@@ -24,14 +24,36 @@ import { SandboxManager } from '../../utils/sandbox/sandbox-adapter.js'
 import { parseToShellIr } from './parser.js'
 import { classifyShellIr, isReadOperation, isDestructive } from './risk.js'
 import { evaluateGate } from './gate.js'
-import type { RiskClass, ShellIrMode } from './types.js'
+import { isShellIr, type RiskClass, type ShellIr, type ShellIrMode } from './types.js'
+
+// ---------------------------------------------------------------------------
+// Typed IR input layer — parse once, enrich input, reuse everywhere
+// ---------------------------------------------------------------------------
+
+/** Internal enrichment attached by validateInput, consumed by later stages. */
+interface ParsedShellIr {
+  ir: ShellIr
+  riskClass: RiskClass
+  stageWords: string[]
+  isRead: boolean
+  isDestructive: boolean
+}
+
+type EnrichedInput = ShellCommandToolInput & { _parsed?: ParsedShellIr }
 
 // ---------------------------------------------------------------------------
 // Input schema
 // ---------------------------------------------------------------------------
 
 const inputSchema = z.strictObject({
-  command: z.string().describe('The shell command to execute'),
+  command: z
+    .string()
+    .optional()
+    .describe('The shell command to execute (required if ir is not provided)'),
+  ir: z
+    .any()
+    .optional()
+    .describe('Pre-parsed Shell IR object — bypasses string parsing. Use this when the IR is already constructed upstream.'),
   timeout: z
     .number()
     .optional()
@@ -50,7 +72,10 @@ const inputSchema = z.strictObject({
     .boolean()
     .optional()
     .describe('Set to true to run this command in the background'),
-})
+}).refine(
+  data => data.command !== undefined || data.ir !== undefined,
+  { message: 'Either command or ir must be provided' },
+)
 
 type InputSchema = typeof inputSchema
 export type ShellCommandToolInput = z.infer<InputSchema>
@@ -100,29 +125,61 @@ const SHELL_COMMAND_TOOL_NAME = 'ShellCommand'
  *
  * Returns null when parsing fails (too-complex, parse-unavailable, empty).
  * Callers treat null as "can't classify, defer to conservative default".
+ *
+ * If called with an EnrichedInput that already has `_parsed` (set by
+ * validateInput), returns the cached result immediately — zero re-parse.
  */
 async function parseAndClassify(
-  command: string,
-): Promise<{
-  ir: import('./types.js').ShellIr
-  riskClass: RiskClass
-  stageWords: string[]
-  isRead: boolean
-  isDestructive: boolean
-} | null> {
+  input: string | EnrichedInput,
+): Promise<ParsedShellIr | null> {
+  if (typeof input !== 'string' && input._parsed) {
+    return input._parsed
+  }
+
+  // IR-first path: caller already parsed the command upstream
+  if (typeof input !== 'string' && input.ir !== undefined) {
+    if (!isShellIr(input.ir)) {
+      return null
+    }
+    const ir = input.ir as ShellIr
+    const riskClass = classifyShellIr(ir)
+    const stageWords =
+      ir.kind === 'simple'
+        ? ir.stage_words
+        : ir.stages.flatMap(s => s.stage_words)
+    const result: ParsedShellIr = {
+      ir,
+      riskClass,
+      stageWords,
+      isRead: isReadOperation(riskClass),
+      isDestructive: isDestructive(riskClass),
+    }
+    input._parsed = result
+    return result
+  }
+
+  const command = typeof input === 'string' ? input : input.command
+  if (!command) {
+    return null
+  }
   const parsed = await parseToShellIr(command)
   if (!parsed.ok) {
     return null
   }
   const { ir, stage_words } = parsed.result
   const riskClass = classifyShellIr(ir)
-  return {
+  const result: ParsedShellIr = {
     ir,
     riskClass,
     stageWords: stage_words,
     isRead: isReadOperation(riskClass),
     isDestructive: isDestructive(riskClass),
   }
+  // Cache on the input object for downstream reuse
+  if (typeof input !== 'string') {
+    input._parsed = result
+  }
+  return result
 }
 
 export const ShellCommandTool = buildTool({
@@ -148,17 +205,17 @@ Use this tool when you need to run shell commands. Prefer it over Bash for comma
   },
 
   async isReadOnly(input) {
-    const classified = await parseAndClassify(input.command)
+    const classified = await parseAndClassify(input as EnrichedInput)
     return classified?.isRead ?? false
   },
 
   async isDestructive(input) {
-    const classified = await parseAndClassify(input.command)
+    const classified = await parseAndClassify(input as EnrichedInput)
     return classified?.isDestructive ?? false
   },
 
   toAutoClassifierInput(input) {
-    return input.command
+    return input.command ?? (input.ir as ShellIr | undefined)?.text ?? ''
   },
 
   get inputSchema(): InputSchema {
@@ -170,29 +227,46 @@ Use this tool when you need to run shell commands. Prefer it over Bash for comma
   },
 
   userFacingName(input) {
-    if (!input?.command) {
+    const label = input?.command ?? (input?.ir as ShellIr | undefined)?.text
+    if (!label) {
       return 'ShellCommand'
     }
-    return input.description ?? input.command
+    return input.description ?? label
   },
 
   getToolUseSummary(input) {
-    if (!input?.command) {
+    const label = input?.command ?? (input?.ir as ShellIr | undefined)?.text
+    if (!label) {
       return null
     }
-    return input.description ?? input.command
+    return input.description ?? label
   },
 
   getActivityDescription(input) {
-    if (!input?.command) {
+    const label = input?.command ?? (input?.ir as ShellIr | undefined)?.text
+    if (!label) {
       return 'Running shell command'
     }
-    return `Running ${input.description ?? input.command}`
+    return `Running ${input.description ?? label}`
   },
 
   async validateInput(
     input: ShellCommandToolInput,
   ): Promise<ValidationResult> {
+    // IR-first path: validate pre-parsed IR directly
+    if (input.ir !== undefined) {
+      if (!isShellIr(input.ir)) {
+        return {
+          result: false,
+          message: 'Invalid Shell IR shape: expected { kind: "simple" | "pipeline", ... }',
+          errorCode: 3,
+        }
+      }
+      await parseAndClassify(input as EnrichedInput)
+      return { result: true }
+    }
+
+    // String path: validate + parse
     if (!input.command || input.command.trim() === '') {
       return {
         result: false,
@@ -210,6 +284,9 @@ Use this tool when you need to run shell commands. Prefer it over Bash for comma
         errorCode: 2,
       }
     }
+    // Parse succeeded — classify and cache on input so downstream stages
+    // (checkPermissions, call) reuse without re-parsing.
+    await parseAndClassify(input as EnrichedInput)
     return { result: true }
   },
 
@@ -217,7 +294,7 @@ Use this tool when you need to run shell commands. Prefer it over Bash for comma
     input: ShellCommandToolInput,
     context: ToolUseContext,
   ): Promise<PermissionResult> {
-    const classified = await parseAndClassify(input.command)
+    const classified = await parseAndClassify(input as EnrichedInput)
     if (!classified) {
       // Parsing failed: fail-safe — ask for permission
       return {
@@ -259,21 +336,25 @@ Use this tool when you need to run shell commands. Prefer it over Bash for comma
     _parentMessage?: AssistantMessage,
     _onProgress?: ToolCallProgress,
   ): Promise<{ data: ShellCommandToolOutput }> {
-    const { command, timeout, run_in_background } = input
+    const { command, timeout, run_in_background, ir } = input
     const { abortController } = toolUseContext
 
-    // Parse + classify (call runs after checkPermissions, so this is
-    // the second parse — acceptable for correctness; cache could be
-    // added later at the Tool interface level).
-    const classified = await parseAndClassify(command)
+    // Reuse _parsed set by validateInput; fallback to fresh parse if missing.
+    const classified = await parseAndClassify(input as EnrichedInput)
     if (!classified) {
       throw new Error('ShellCommandTool: parseAndClassify failed in call')
     }
 
     const timeoutMs = timeout ?? 300_000 // 5 minutes default
 
+    // Resolve command to execute: explicit string beats IR.text
+    const commandToExec = command ?? (ir as ShellIr | undefined)?.text ?? ''
+    if (!commandToExec) {
+      throw new Error('ShellCommandTool: no command or ir.text to execute')
+    }
+
     // Execute via existing shell infrastructure
-    const shellCommand = await exec(command, abortController.signal, 'bash', {
+    const shellCommand = await exec(commandToExec, abortController.signal, 'bash', {
       timeout: timeoutMs,
     })
 

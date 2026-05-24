@@ -35,9 +35,8 @@ import {
   type ToolProgressData,
   type ToolUseContext,
 } from '../../Tool.js'
-import type { BashToolInput } from '../../tools/BashTool/BashTool.js'
-import { startSpeculativeClassifierCheck } from '../../tools/BashTool/bashPermissions.js'
-import { BASH_TOOL_NAME } from '../../tools/BashTool/toolName.js'
+import type { ShellCommandToolInput } from '../../tools/ShellCommandTool/ShellCommandTool.js'
+import { SHELL_COMMAND_TOOL_NAME } from '../../tools/ShellCommandTool/toolName.js'
 import { FILE_EDIT_TOOL_NAME } from '../../tools/FileEditTool/constants.js'
 import { FILE_READ_TOOL_NAME } from '../../tools/FileReadTool/prompt.js'
 import { FILE_WRITE_TOOL_NAME } from '../../tools/FileWriteTool/prompt.js'
@@ -133,7 +132,7 @@ import {
 /** Minimum total hook duration (ms) to show inline timing summary */
 export const HOOK_TIMING_DISPLAY_THRESHOLD_MS = 500
 /** Log a debug warning when hooks/permission-decision block for this long. Matches
- * BashTool's PROGRESS_THRESHOLD_MS — the collapsed view feels stuck past this. */
+ * ShellCommandTool's PROGRESS_THRESHOLD_MS — the collapsed view feels stuck past this. */
 const SLOW_PHASE_LOG_THRESHOLD_MS = 2000
 
 /**
@@ -731,46 +730,9 @@ async function checkPermissionsAndCallTool(
       },
     ]
   }
-  // Speculatively start the bash allow classifier check early so it runs in
-  // parallel with pre-tool hooks, deny/ask classifiers, and permission dialog
-  // setup. The UI indicator (setClassifierChecking) is NOT set here — it's
-  // set in interactiveHandler.ts only when the permission check returns `ask`
-  // with a pendingClassifierCheck. This avoids flashing "classifier running"
-  // for commands that auto-allow via prefix rules.
-  if (
-    tool.name === BASH_TOOL_NAME &&
-    parsedInput.data &&
-    'command' in parsedInput.data
-  ) {
-    const appState = toolUseContext.getAppState()
-    startSpeculativeClassifierCheck(
-      (parsedInput.data as BashToolInput).command,
-      appState.toolPermissionContext,
-      toolUseContext.abortController.signal,
-      toolUseContext.options.isNonInteractiveSession,
-    )
-  }
-
   const resultingMessages = []
 
-  // Defense-in-depth: strip _simulatedSedEdit from model-provided Bash input.
-  // This field is internal-only — it must only be injected by the permission
-  // system (SedEditPermissionRequest) after user approval. If the model supplies
-  // it, the schema's strictObject should already reject it, but we strip here
-  // as a safeguard against future regressions.
   let processedInput = parsedInput.data
-  if (
-    tool.name === BASH_TOOL_NAME &&
-    processedInput &&
-    typeof processedInput === 'object' &&
-    '_simulatedSedEdit' in processedInput
-  ) {
-    const { _simulatedSedEdit: _, ...rest } =
-      processedInput as typeof processedInput & {
-        _simulatedSedEdit: unknown
-      }
-    processedInput = rest as typeof processedInput
-  }
 
   // Backfill legacy/derived fields on a shallow clone so hooks/canUseTool see
   // them without affecting tool.call(). SendMessageTool adds fields; file
@@ -900,9 +862,9 @@ async function checkPermissionsAndCallTool(
       'file_path' in processedInput
     ) {
       toolAttributes.file_path = String(processedInput.file_path)
-    } else if (tool.name === BASH_TOOL_NAME && 'command' in processedInput) {
-      const bashInput = processedInput as BashToolInput
-      toolAttributes.full_command = bashInput.command
+    } else if (tool.name === SHELL_COMMAND_TOOL_NAME && 'command' in processedInput) {
+      const shellInput = processedInput as ShellCommandToolInput
+      toolAttributes.full_command = shellInput.command
     }
   }
 
@@ -1137,22 +1099,19 @@ async function checkPermissionsAndCallTool(
   const telemetryToolInput = extractToolInputForTelemetry(processedInput)
   let toolParameters: Record<string, unknown> = {}
   if (isToolDetailsLoggingEnabled()) {
-    if (tool.name === BASH_TOOL_NAME && 'command' in processedInput) {
-      const bashInput = processedInput as BashToolInput
-      const commandParts = bashInput.command.trim().split(/\s+/)
-      const bashCommand = commandParts[0] || ''
+    if (tool.name === SHELL_COMMAND_TOOL_NAME && 'command' in processedInput) {
+      const shellInput = processedInput as ShellCommandToolInput
+      const commandParts = shellInput.command.trim().split(/\s+/)
+      const shellCommand = commandParts[0] || ''
 
       toolParameters = {
-        bash_command: bashCommand,
-        full_command: bashInput.command,
-        ...(bashInput.timeout !== undefined && {
-          timeout: bashInput.timeout,
+        bash_command: shellCommand,
+        full_command: shellInput.command,
+        ...(shellInput.timeout !== undefined && {
+          timeout: shellInput.timeout,
         }),
-        ...(bashInput.description !== undefined && {
-          description: bashInput.description,
-        }),
-        ...('dangerouslyDisableSandbox' in bashInput && {
-          dangerouslyDisableSandbox: bashInput.dangerouslyDisableSandbox,
+        ...(shellInput.description !== undefined && {
+          description: shellInput.description,
         }),
       }
     }
@@ -1254,9 +1213,9 @@ async function checkPermissionsAndCallTool(
       }
 
       // Bash tool: capture command
-      if (tool.name === BASH_TOOL_NAME && 'command' in processedInput) {
-        const bashInput = processedInput as BashToolInput
-        contentAttributes.bash_command = bashInput.command
+      if (tool.name === SHELL_COMMAND_TOOL_NAME && 'command' in processedInput) {
+        const shellInput = processedInput as ShellCommandToolInput
+        contentAttributes.bash_command = shellInput.command
         // Also capture output if available
         if ('output' in result.data) {
           contentAttributes.output = String(result.data.output)
@@ -1319,11 +1278,10 @@ async function checkPermissionsAndCallTool(
         fileExtension = getFileExtensionForAnalytics(
           String(processedInput.notebook_path),
         )
-      } else if (tool.name === BASH_TOOL_NAME && 'command' in processedInput) {
-        const bashInput = processedInput as BashToolInput
+      } else if (tool.name === SHELL_COMMAND_TOOL_NAME && 'command' in processedInput) {
+        const shellInput = processedInput as ShellCommandToolInput
         fileExtension = getFileExtensionsFromBashCommand(
-          bashInput.command,
-          bashInput._simulatedSedEdit?.filePath,
+          shellInput.command,
         )
       }
     }
@@ -1359,7 +1317,7 @@ async function checkPermissionsAndCallTool(
     // Enrich tool parameters with git commit ID from successful git commit output
     if (
       isToolDetailsLoggingEnabled() &&
-      (tool.name === BASH_TOOL_NAME || tool.name === POWERSHELL_TOOL_NAME) &&
+      (tool.name === SHELL_COMMAND_TOOL_NAME || tool.name === POWERSHELL_TOOL_NAME) &&
       'command' in processedInput &&
       typeof processedInput.command === 'string' &&
       processedInput.command.match(/\bgit\s+commit\b/) &&

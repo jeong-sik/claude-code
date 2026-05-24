@@ -14,7 +14,7 @@ import { lazySchema } from '../utils/lazySchema.js'
 import { SHELL_TYPES } from '../utils/shell/shellProvider.js'
 
 // Shared schema for the `if` condition field.
-// Uses permission rule syntax (e.g., "Bash(git *)", "Read(*.ts)") to filter hooks
+// Uses permission rule syntax (e.g., "ShellCommand(git *)", "Read(*.ts)") to filter hooks
 // before spawning. Evaluated against the hook input's tool_name and tool_input.
 const IfConditionSchema = lazySchema(() =>
   z
@@ -29,7 +29,7 @@ const IfConditionSchema = lazySchema(() =>
 // Internal factory for individual hook schemas (shared between exported
 // discriminated union members and the HookCommandSchema factory)
 function buildHookSchemas() {
-  const BashCommandHookSchema = z.object({
+  const ShellCommandHookSchema = z.object({
     type: z.literal('command').describe('Shell command hook type'),
     command: z.string().describe('Shell command to execute'),
     if: IfConditionSchema(),
@@ -163,7 +163,7 @@ function buildHookSchemas() {
   })
 
   return {
-    BashCommandHookSchema,
+    ShellCommandHookSchema,
     PromptHookSchema,
     HttpHookSchema,
     AgentHookSchema,
@@ -175,13 +175,13 @@ function buildHookSchemas() {
  */
 export const HookCommandSchema = lazySchema(() => {
   const {
-    BashCommandHookSchema,
+    ShellCommandHookSchema,
     PromptHookSchema,
     AgentHookSchema,
     HttpHookSchema,
   } = buildHookSchemas()
   return z.discriminatedUnion('type', [
-    BashCommandHookSchema,
+    ShellCommandHookSchema,
     PromptHookSchema,
     AgentHookSchema,
     HttpHookSchema,
@@ -214,7 +214,7 @@ export const HooksSchema = lazySchema(() =>
 
 // Inferred types from schemas
 export type HookCommand = z.infer<ReturnType<typeof HookCommandSchema>>
-export type BashCommandHook = Extract<HookCommand, { type: 'command' }>
+export type ShellCommandHook = Extract<HookCommand, { type: 'command' }>
 export type PromptHook = Extract<HookCommand, { type: 'prompt' }>
 export type AgentHook = Extract<HookCommand, { type: 'agent' }>
 export type HttpHook = Extract<HookCommand, { type: 'http' }>

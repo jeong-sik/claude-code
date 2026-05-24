@@ -1,9 +1,9 @@
 import type { ContentBlockParam } from '@anthropic-ai/sdk/resources';
 import { randomUUID } from 'crypto';
 import * as React from 'react';
-import { BashModeProgress } from 'src/components/BashModeProgress.js';
+import { ShellCommandModeProgress } from 'src/components/ShellCommandModeProgress.js';
 import type { SetToolJSXFn } from 'src/Tool.js';
-import { BashTool } from 'src/tools/BashTool/BashTool.js';
+import { ShellCommandTool } from 'src/tools/ShellCommandTool/ShellCommandTool.js';
 import type { AttachmentMessage, SystemMessage, UserMessage } from 'src/types/message.js';
 import type { ShellProgress } from 'src/types/tools.js';
 import { logEvent } from '../../services/analytics/index.js';
@@ -14,7 +14,7 @@ import { isPowerShellToolEnabled } from '../shell/shellToolUtils.js';
 import { processToolResultBlock } from '../toolResultStorage.js';
 import { escapeXml } from '../xml.js';
 import type { ProcessUserInputContext } from './processUserInput.js';
-export async function processBashCommand(inputString: string, precedingInputBlocks: ContentBlockParam[], attachmentMessages: AttachmentMessage[], context: ProcessUserInputContext, setToolJSX: SetToolJSXFn): Promise<{
+export async function processShellCommand(inputString: string, precedingInputBlocks: ContentBlockParam[], attachmentMessages: AttachmentMessage[], context: ProcessUserInputContext, setToolJSX: SetToolJSXFn): Promise<{
   messages: (UserMessage | AttachmentMessage | SystemMessage)[];
   shouldQuery: boolean;
 }> {
@@ -39,11 +39,11 @@ export async function processBashCommand(inputString: string, precedingInputBloc
 
   // Just show initial UI
   setToolJSX({
-    jsx: <BashModeProgress input={inputString} progress={null} verbose={context.options.verbose} />,
+    jsx: <ShellCommandModeProgress input={inputString} progress={null} verbose={context.options.verbose} />,
     shouldHidePromptInput: false
   });
   try {
-    const bashModeContext: ProcessUserInputContext = {
+    const shellCommandModeContext: ProcessUserInputContext = {
       ...context,
       // TODO: Clean up this hack
       setToolJSX: _ => {
@@ -57,7 +57,7 @@ export async function processBashCommand(inputString: string, precedingInputBloc
     }) => {
       setToolJSX({
         jsx: <>
-            <BashModeProgress input={inputString!} progress={progress.data} verbose={context.options.verbose} />
+            <ShellCommandModeProgress input={inputString!} progress={progress.data} verbose={context.options.verbose} />
             {jsx}
           </>,
         shouldHidePromptInput: false,
@@ -78,13 +78,11 @@ export async function processBashCommand(inputString: string, precedingInputBloc
       PowerShellTool = (require('src/tools/PowerShellTool/PowerShellTool.js') as PSMod).PowerShellTool;
       /* eslint-enable @typescript-eslint/no-require-imports */
     }
-    const shellTool = PowerShellTool ?? BashTool;
+    const shellTool = PowerShellTool ?? ShellCommandTool;
     const response = PowerShellTool ? await PowerShellTool.call({
       command: inputString,
-      dangerouslyDisableSandbox: true
-    }, bashModeContext, undefined, undefined, onProgress) : await BashTool.call({
+    }, bashModeContext, undefined, undefined, onProgress) : await ShellCommandTool.call({
       command: inputString,
-      dangerouslyDisableSandbox: true
     }, bashModeContext, undefined, undefined, onProgress);
     const data = response.data;
     if (!data) {
@@ -92,7 +90,7 @@ export async function processBashCommand(inputString: string, precedingInputBloc
     }
     const stderr = data.stderr;
     // Reuse the same formatting pipeline as inline !`cmd` bash (promptShellExecution)
-    // and model-initiated Bash. When BashTool.call() persists large output to disk,
+    // and model-initiated Bash. When ShellCommandTool.call() persists large output to disk,
     // data.persistedOutputPath is set and the formatter wraps in <persisted-output>.
     // Pass stderr:'' to keep it separate for the <bash-stderr> UI tag.
     const mapped = await processToolResultBlock(shellTool, {
@@ -102,7 +100,7 @@ export async function processBashCommand(inputString: string, precedingInputBloc
     // mapped.content may contain our own <persisted-output> wrapper (trusted
     // XML from buildLargeToolResultMessage). Escaping it would turn structural
     // tags into &lt;persisted-output&gt;, breaking the model's parse and
-    // UserBashOutputMessage's extractTag. Escape the raw fallback only.
+    // UserShellCommandOutputMessage's extractTag. Escape the raw fallback only.
     const stdout = typeof mapped.content === 'string' ? mapped.content : escapeXml(data.stdout);
     return {
       messages: [createSyntheticUserCaveatMessage(), userMessage, ...attachmentMessages, createUserMessage({

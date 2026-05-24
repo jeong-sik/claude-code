@@ -4,10 +4,10 @@
  *
  * Maps flattened stage words to RiskClass (R0/R1/R2/Destructive_protected).
  * This is the typed replacement for the 25+ regex validators in
- * bashSecurity.ts.
+ * shellSecurity.ts.
  */
 
-import type { RiskClass, ShellIr } from './types.js'
+import type { RiskBrandedIr, RiskClass, ShellIr } from './types.js'
 import { getBaseCommand, getAllBaseCommands } from './parser.js'
 
 /**
@@ -125,6 +125,7 @@ export function classifyRisk(words: string[]): RiskClass {
       'cmake',
       'cargo',
       'go',
+      'uv',
     ].includes(base)
   ) {
     return 'R1_Reversible_mutation'
@@ -173,7 +174,7 @@ export function classifyRisk(words: string[]): RiskClass {
   }
 
   // --- Disk / data destruction ---------------------------------------------
-  if (['dd', 'shred', 'mkfs', 'fdisk', 'parted'].includes(base)) {
+  if (['dd', 'shred', 'fdisk', 'parted'].includes(base) || base === 'mkfs' || base.startsWith('mkfs.')) {
     return 'R2_Irreversible'
   }
 
@@ -275,6 +276,22 @@ export function classifyShellIr(ir: ShellIr): RiskClass {
   }
 
   return classifyRisk(allWords)
+}
+
+/**
+ * Classify + brand a ShellIr with its RiskClass at the type level.
+ *
+ * Returns the same ShellIr object at runtime (no allocation), but typed
+ * as RiskBrandedIr so downstream functions can demand specific risk levels
+ * at compile time.
+ *
+ * Example:
+ *   const branded = classifyAndBrand(ir)
+ *   function onlyRead(ir: RiskBrandedIr<'R0_Read'>) { ... }
+ */
+export function classifyAndBrand(ir: ShellIr): RiskBrandedIr<RiskClass> {
+  const riskClass = classifyShellIr(ir)
+  return ir as RiskBrandedIr<typeof riskClass>
 }
 
 /**

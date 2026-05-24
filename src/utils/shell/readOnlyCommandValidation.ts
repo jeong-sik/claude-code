@@ -1,5 +1,5 @@
 /**
- * Shared command validation maps for shell tools (BashTool, PowerShellTool, etc.).
+ * Shared command validation maps for shell tools (ShellCommandTool, PowerShellTool, etc.).
  *
  * Exports complete command configuration maps that any shell tool can import:
  * - GIT_READ_ONLY_COMMANDS: all git subcommands with safe flags and callbacks
@@ -1533,7 +1533,7 @@ export const PYRIGHT_READ_ONLY_COMMANDS: Record<string, ExternalCommandConfig> =
 // ---------------------------------------------------------------------------
 // EXTERNAL_READONLY_COMMANDS — cross-shell read-only commands
 // Only commands that work identically in bash and PowerShell on Windows.
-// Unix-specific commands (cat, head, wc, etc.) belong in BashTool's READONLY_COMMANDS.
+// Unix-specific commands (cat, head, wc, etc.) belong in ShellCommandTool's READONLY_COMMANDS.
 // ---------------------------------------------------------------------------
 
 export const EXTERNAL_READONLY_COMMANDS: readonly string[] = [
@@ -1671,7 +1671,7 @@ export function validateFlagArgument(
 
 /**
  * Validates the flags/arguments portion of a tokenized command against a config.
- * This is the flag-walking loop extracted from BashTool's isCommandSafeViaFlagParsing.
+ * This is the flag-walking loop extracted from ShellCommandTool's isCommandSafeViaFlagParsing.
  *
  * @param tokens - Pre-tokenized args (from bash shell-quote or PowerShell AST)
  * @param startIndex - Where to start validating (after command tokens)

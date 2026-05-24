@@ -77,9 +77,9 @@ async function isMarketplacePluginRelevant(
   if (isPluginInstalled(`${pluginName}@${OFFICIAL_MARKETPLACE_NAME}`)) {
     return false
   }
-  const { bashTools } = context ?? {}
-  if (signals.cli && bashTools?.size) {
-    if (signals.cli.some(cmd => bashTools.has(cmd))) {
+  const { bashTools: shellCommandTools } = context ?? {}
+  if (signals.cli && shellCommandTools?.size) {
+    if (signals.cli.some(cmd => shellCommandTools.has(cmd))) {
       return true
     }
   }

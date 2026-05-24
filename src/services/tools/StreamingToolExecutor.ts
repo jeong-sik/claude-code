@@ -6,7 +6,7 @@ import {
 } from 'src/utils/messages.js'
 import type { CanUseToolFn } from '../../hooks/useCanUseTool.js'
 import { findToolByName, type Tools, type ToolUseContext } from '../../Tool.js'
-import { BASH_TOOL_NAME } from '../../tools/BashTool/toolName.js'
+import { SHELL_COMMAND_TOOL_NAME } from '../../tools/ShellCommandTool/toolName.js'
 import type { AssistantMessage, Message } from '../../types/message.js'
 import { createChildAbortController } from '../../utils/abortController.js'
 import { runToolUse } from './toolExecution.js'
@@ -356,7 +356,7 @@ export class StreamingToolExecutor {
           // Only Bash errors cancel siblings. Bash commands often have implicit
           // dependency chains (e.g. mkdir fails → subsequent commands pointless).
           // Read/WebFetch/etc are independent — one failure shouldn't nuke the rest.
-          if (tool.block.name === BASH_TOOL_NAME) {
+          if (tool.block.name === SHELL_COMMAND_TOOL_NAME) {
             this.hasErrored = true
             this.erroredToolDescription = this.getToolDescription(tool)
             this.siblingAbortController.abort('sibling_error')

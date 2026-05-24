@@ -1,7 +1,7 @@
 /**
  * Risk-class based permission gate for ShellCommandTool.
  *
- * Replaces the 25+ regex validators in bashSecurity.ts with a typed,
+ * Replaces the 25+ regex validators in shellSecurity.ts with a typed,
  * single-source-of-truth gate that uses the RiskClass from Shell IR
  * classification.
  *

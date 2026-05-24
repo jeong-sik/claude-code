@@ -222,7 +222,7 @@ export function isShellCommandTargetingMemory(command: string): boolean {
   // Quick check: does the command mention the config, memory base, or
   // auto-mem directory? Compare in forward-slash form (PowerShell on Windows
   // may use either separator while configDir uses the platform-native one).
-  // On Windows also check the MinGW form (/c/...) since BashTool runs under
+  // On Windows also check the MinGW form (/c/...) since ShellCommandTool runs under
   // Git Bash which emits that encoding. On Linux/Mac, configDir is already
   // posix so only one form to check — and crucially, windowsPathToPosixPath
   // is NOT called, so Linux paths like /m/foo aren't misinterpreted as MinGW.
@@ -231,7 +231,7 @@ export function isShellCommandTargetingMemory(command: string): boolean {
   const matchesAnyDir = dirs.some(d => {
     if (commandCmp.includes(toComparable(d))) return true
     if (IS_WINDOWS) {
-      // BashTool on Windows (Git Bash) emits /c/Users/... — check MinGW form too
+      // ShellCommandTool on Windows (Git Bash) emits /c/Users/... — check MinGW form too
       return commandCmp.includes(windowsPathToPosixPath(d).toLowerCase())
     }
     return false

@@ -8,11 +8,10 @@ import { getFeatureValue_CACHED_MAY_BE_STALE } from '../../../services/analytics
 import { type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS, logEvent } from '../../../services/analytics/index.js';
 import { sanitizeToolNameForAnalytics } from '../../../services/analytics/metadata.js';
 import { useAppState } from '../../../state/AppState.js';
-import { BashTool } from '../../../tools/BashTool/BashTool.js';
-import { getFirstWordPrefix, getSimpleCommandPrefix } from '../../../tools/BashTool/bashPermissions.js';
-import { getDestructiveCommandWarning } from '../../../tools/BashTool/destructiveCommandWarning.js';
-import { parseSedEditCommand } from '../../../tools/BashTool/sedEditParser.js';
-import { shouldUseSandbox } from '../../../tools/BashTool/shouldUseSandbox.js';
+import { ShellCommandTool } from '../../../tools/ShellCommandTool/ShellCommandTool.js';
+import { getFirstWordPrefix, getSimpleCommandPrefix, getDestructiveCommandWarning } from '../../../tools/ShellCommandTool/utils.js';
+import { parseSedEditCommand } from '../../../tools/ShellCommandTool/sedEditParser.js';
+import { shouldUseSandbox } from '../../../tools/ShellCommandTool/shouldUseSandbox.js';
 import { getCompoundCommandPrefixesStatic } from '../../../utils/bash/prefix.js';
 import { createPromptRuleContent, generateGenericDescription, getBashPromptAllowDescriptions, isClassifierPermissionsEnabled } from '../../../utils/permissions/bashClassifier.js';
 import { extractRules } from '../../../utils/permissions/PermissionUpdate.js';
@@ -30,10 +29,10 @@ import { PermissionRuleExplanation } from '../PermissionRuleExplanation.js';
 import { SedEditPermissionRequest } from '../SedEditPermissionRequest/SedEditPermissionRequest.js';
 import { useShellPermissionFeedback } from '../useShellPermissionFeedback.js';
 import { logUnaryPermissionEvent } from '../utils.js';
-import { bashToolUseOptions } from './bashToolUseOptions.js';
+import { shellCommandToolUseOptions } from './shellCommandToolUseOptions.js';
 const CHECKING_TEXT = 'Attempting to auto-approve\u2026';
 
-// Isolates the 20fps shimmer clock from BashPermissionRequestInner. Before this
+// Isolates the 20fps shimmer clock from ShellCommandPermissionRequestInner. Before this
 // extraction, useShimmerAnimation lived inside the 535-line Inner body, so every
 // 50ms clock tick re-rendered the entire dialog (PermissionDialog + Select +
 // all children) for the ~1-3 seconds the classifier typically takes. Inner also
@@ -68,7 +67,7 @@ function ClassifierCheckingSubtitle() {
   }
   return t2;
 }
-export function BashPermissionRequest(props) {
+export function ShellCommandPermissionRequest(props) {
   const $ = _c(21);
   const {
     toolUseConfirm,
@@ -85,7 +84,7 @@ export function BashPermissionRequest(props) {
     ({
       command,
       description
-    } = BashTool.inputSchema.parse(toolUseConfirm.input));
+    } = ShellCommandTool.inputSchema.parse(toolUseConfirm.input));
     t0 = parseSedEditCommand(command);
     $[0] = toolUseConfirm.input;
     $[1] = command;
@@ -116,7 +115,7 @@ export function BashPermissionRequest(props) {
   }
   let t1;
   if ($[12] !== command || $[13] !== description || $[14] !== onDone || $[15] !== onReject || $[16] !== toolUseConfirm || $[17] !== toolUseContext || $[18] !== verbose || $[19] !== workerBadge) {
-    t1 = <BashPermissionRequestInner toolUseConfirm={toolUseConfirm} toolUseContext={toolUseContext} onDone={onDone} onReject={onReject} verbose={verbose} workerBadge={workerBadge} command={command} description={description} />;
+    t1 = <ShellCommandPermissionRequestInner toolUseConfirm={toolUseConfirm} toolUseContext={toolUseContext} onDone={onDone} onReject={onReject} verbose={verbose} workerBadge={workerBadge} command={command} description={description} />;
     $[12] = command;
     $[13] = description;
     $[14] = onDone;
@@ -133,7 +132,7 @@ export function BashPermissionRequest(props) {
 }
 
 // Inner component that uses hooks - only called for non-MCP CLI commands
-function BashPermissionRequestInner({
+function ShellCommandPermissionRequestInner({
   toolUseConfirm,
   toolUseContext,
   onDone,
@@ -204,7 +203,7 @@ function BashPermissionRequestInner({
   // When compound with exactly one Bash rule (e.g. `cd src && npm test` where
   // cd is read-only → only npm test needs approval), seed the editable input
   // from the backend rule. When compound with 2+ rules, editablePrefix stays
-  // undefined so bashToolUseOptions falls through to yes-apply-suggestions,
+  // undefined so shellCommandToolUseOptions falls through to yes-apply-suggestions,
   // which saves all per-subcommand rules atomically.
   const isCompound = toolUseConfirm.permissionResult.decisionReason?.type === 'subcommandResults';
 
@@ -221,7 +220,7 @@ function BashPermissionRequestInner({
       // Backend suggestion is the source of truth for compound commands.
       // Single rule → seed the editable input so the user can refine it.
       // Multiple/zero rules → undefined → yes-apply-suggestions handles it.
-      const backendBashRules = extractRules('suggestions' in toolUseConfirm.permissionResult ? toolUseConfirm.permissionResult.suggestions : undefined).filter(r => r.toolName === BashTool.name && r.ruleContent);
+      const backendBashRules = extractRules('suggestions' in toolUseConfirm.permissionResult ? toolUseConfirm.permissionResult.suggestions : undefined).filter(r => r.toolName === ShellCommandTool.name && r.ruleContent);
       return backendBashRules.length === 1 ? backendBashRules[0]!.ruleContent : undefined;
     }
     const two = getSimpleCommandPrefix(command);
@@ -240,9 +239,9 @@ function BashPermissionRequestInner({
     // the full per-subcommand analysis and its suggestion is correct.
     if (isCompound) return;
     let cancelled = false;
-    getCompoundCommandPrefixesStatic(command, subcmd => BashTool.isReadOnly({
+    getCompoundCommandPrefixesStatic(command, subcmd => ShellCommandTool.isReadOnly?.({
       command: subcmd
-    })).then(prefixes => {
+    }) ?? false).then(prefixes => {
       if (cancelled || hasUserEditedPrefix.current) return;
       if (prefixes.length > 0) {
         setEditablePrefix(`${prefixes[0]}:*`);
@@ -286,7 +285,7 @@ function BashPermissionRequestInner({
   }), []);
   usePermissionRequestLogging(toolUseConfirm, unaryEvent);
   const existingAllowDescriptions = useMemo(() => getBashPromptAllowDescriptions(toolPermissionContext), [toolPermissionContext]);
-  const options = useMemo(() => bashToolUseOptions({
+  const options = useMemo(() => shellCommandToolUseOptions({
     suggestions: toolUseConfirm.permissionResult.behavior === 'ask' ? toolUseConfirm.permissionResult.suggestions : undefined,
     decisionReason: toolUseConfirm.permissionResult.decisionReason,
     onRejectFeedbackChange: setRejectFeedback,
@@ -348,7 +347,7 @@ function BashPermissionRequestInner({
         const prefixUpdates: PermissionUpdate[] = [{
           type: 'addRules',
           rules: [{
-            toolName: BashTool.name,
+            toolName: ShellCommandTool.name,
             ruleContent: trimmedPrefix
           }],
           behavior: 'allow',
@@ -368,7 +367,7 @@ function BashPermissionRequestInner({
         const permissionUpdates: PermissionUpdate[] = [{
           type: 'addRules',
           rules: [{
-            toolName: BashTool.name,
+            toolName: ShellCommandTool.name,
             ruleContent: createPromptRuleContent(trimmedDescription)
           }],
           behavior: 'allow',
@@ -435,14 +434,13 @@ function BashPermissionRequestInner({
   return <PermissionDialog workerBadge={workerBadge} title={sandboxingEnabled_0 && !isSandboxed_0 ? 'Bash command (unsandboxed)' : 'Bash command'} subtitle={classifierSubtitle}>
       <Box flexDirection="column" paddingX={2} paddingY={1}>
         <Text dimColor={explainerState.visible}>
-          {BashTool.renderToolUseMessage({
+          {ShellCommandTool.renderToolUseMessage?.({
           command,
           description
         }, {
           theme,
           verbose: true
-        } // always show the full command
-        )}
+        }) ?? command}
         </Text>
         {!explainerState.visible && <Text dimColor>{toolUseConfirm.description}</Text>}
         <PermissionExplainerContent visible={explainerState.visible} promise={explainerState.promise} />

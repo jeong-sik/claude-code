@@ -69,3 +69,49 @@ export type ShellIrGateVerdict =
   | { behavior: 'allow'; reason?: string }
   | { behavior: 'deny'; reason: string }
   | { behavior: 'ask'; reason: string }
+
+// ---------------------------------------------------------------------------
+// Risk-branded types — phantom-type discipline for compile-time safety
+// ---------------------------------------------------------------------------
+
+declare const __riskBrand: unique symbol
+
+/**
+ * A ShellIr tagged at the type level with its RiskClass.
+ *
+ * This is a *phantom type* — the brand exists only in TypeScript's type
+ * system. At runtime it is the same object as the original ShellIr.
+ *
+ * Usage:
+ *   const branded = classifyAndBrand(ir)  // RiskBrandedIr<RiskClass>
+ *   function onlyRead(ir: RiskBrandedIr<'R0_Read'>) { ... }
+ */
+export type RiskBrandedIr<R extends RiskClass> = ShellIr & {
+  readonly [__riskBrand]: R
+}
+
+// ---------------------------------------------------------------------------
+// Runtime type guard for ShellIr (used when IR is passed from external caller)
+// ---------------------------------------------------------------------------
+
+/** Validate that a value conforms to ShellIr shape at runtime. */
+export function isShellIr(value: unknown): value is ShellIr {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+  if (v.kind === 'simple') {
+    return (
+      Array.isArray(v.stage_words) &&
+      v.stage_words.every(w => typeof w === 'string') &&
+      Array.isArray(v.env_vars) &&
+      Array.isArray(v.redirects) &&
+      typeof v.text === 'string'
+    )
+  }
+  if (v.kind === 'pipeline') {
+    return (
+      Array.isArray(v.stages) &&
+      v.stages.every(s => isShellIr(s))
+    )
+  }
+  return false
+}

@@ -243,9 +243,9 @@ export const ExitWorktreeTool: Tool<InputSchema, Output> = buildTool({
 
     // --worktree startup calls setOriginalCwd(getCwd()) and
     // setProjectRoot(getCwd()) back-to-back right after setCwd(worktreePath)
-    // (setup.ts:235/239), so both hold the same realpath'd value and BashTool
+    // (setup.ts:235/239), so both hold the same realpath'd value and ShellCommandTool
     // cd never touches either. Mid-session EnterWorktreeTool sets originalCwd
-    // but NOT projectRoot. (Can't use getCwd() — BashTool mutates it on every
+    // but NOT projectRoot. (Can't use getCwd() — ShellCommandTool mutates it on every
     // cd. Can't use session.worktreePath — it's join()'d, not realpath'd.)
     const projectRootIsWorktree = getProjectRoot() === getOriginalCwd()
 

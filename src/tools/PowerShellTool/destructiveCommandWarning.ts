@@ -55,7 +55,7 @@ const DESTRUCTIVE_PATTERNS: DestructivePattern[] = [
     warning: 'Note: may clear a disk',
   },
 
-  // Git destructive operations (same as BashTool)
+  // Git destructive operations (same as ShellCommandTool)
   {
     pattern: /\bgit\s+reset\s+--hard\b/i,
     warning: 'Note: may discard uncommitted changes',

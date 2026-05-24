@@ -77,7 +77,7 @@ const TIP_MATCHERS: TipMatcher[] = [
       ctx.path.includes('hooks') && ctx.code === 'invalid_type',
     tip: {
       suggestion:
-        // gh-31187 / CC-282: prior example showed {"matcher": {"tools": ["BashTool"]}}
+        // gh-31187 / CC-282: prior example showed {"matcher": {"tools": ["ShellCommandTool"]}}
         // — an object format that never existed in the schema (matcher is z.string(),
         // always has been). Users copied the tip's example and got the same validation
         // error again. See matchesPattern() in hooks.ts: matcher is exact-match,

@@ -21,7 +21,7 @@ import type { inputSchema } from './MCPTool.js';
 const MCP_OUTPUT_WARNING_THRESHOLD_TOKENS = 10_000;
 
 // In non-verbose mode, truncate individual input values to keep the header
-// compact. Matches BashTool's philosophy of showing enough to identify the
+// compact. Matches ShellCommandTool's philosophy of showing enough to identify the
 // call without dumping the entire payload inline.
 const MAX_INPUT_VALUE_CHARS = 80;
 

@@ -1,4 +1,4 @@
-import { BASH_TOOL_NAME } from '../../../tools/BashTool/toolName.js';
+import { SHELL_COMMAND_TOOL_NAME } from '../../../tools/ShellCommandTool/toolName.js';
 import { extractOutputRedirections } from '../../../utils/bash/commands.js';
 import { isClassifierPermissionsEnabled } from '../../../utils/permissions/bashClassifier.js';
 import type { PermissionDecisionReason } from '../../../utils/permissions/PermissionResult.js';
@@ -6,7 +6,7 @@ import type { PermissionUpdate } from '../../../utils/permissions/PermissionUpda
 import { shouldShowAlwaysAllowOptions } from '../../../utils/permissions/permissionsLoader.js';
 import type { OptionWithDescription } from '../../CustomSelect/select.js';
 import { generateShellSuggestionsLabel } from '../shellPermissionHelpers.js';
-export type BashToolUseOption = 'yes' | 'yes-apply-suggestions' | 'yes-prefix-edited' | 'yes-classifier-reviewed' | 'no';
+export type ShellCommandToolUseOption = 'yes' | 'yes-apply-suggestions' | 'yes-prefix-edited' | 'yes-classifier-reviewed' | 'no';
 
 /**
  * Check if a description already exists in the allow list.
@@ -28,7 +28,7 @@ function stripBashRedirections(command: string): string {
   // Only use stripped version if there were actual redirections
   return redirections.length > 0 ? commandWithoutRedirections : command;
 }
-export function bashToolUseOptions({
+export function shellCommandToolUseOptions({
   suggestions = [],
   decisionReason,
   onRejectFeedbackChange,
@@ -57,8 +57,8 @@ export function bashToolUseOptions({
   editablePrefix?: string;
   /** Callback when the user edits the prefix value. */
   onEditablePrefixChange?: (value: string) => void;
-}): OptionWithDescription<BashToolUseOption>[] {
-  const options: OptionWithDescription<BashToolUseOption>[] = [];
+}): OptionWithDescription<ShellCommandToolUseOption>[] {
+  const options: OptionWithDescription<ShellCommandToolUseOption>[] = [];
   if (yesInputMode) {
     options.push({
       type: 'input',
@@ -81,7 +81,7 @@ export function bashToolUseOptions({
     // Haiku-generated suggestion label — but only when the suggestions
     // don't contain non-Bash items (addDirectories, Read rules) that
     // the editable prefix can't represent.
-    const hasNonBashSuggestions = suggestions.some(s => s.type === 'addDirectories' || s.type === 'addRules' && s.rules?.some(r => r.toolName !== BASH_TOOL_NAME));
+    const hasNonBashSuggestions = suggestions.some(s => s.type === 'addDirectories' || s.type === 'addRules' && s.rules?.some(r => r.toolName !== SHELL_COMMAND_TOOL_NAME));
     if (editablePrefix !== undefined && onEditablePrefixChange && !hasNonBashSuggestions && suggestions.length > 0) {
       options.push({
         type: 'input',
@@ -96,7 +96,7 @@ export function bashToolUseOptions({
         resetCursorOnUpdate: true
       });
     } else if (suggestions.length > 0) {
-      const label = generateShellSuggestionsLabel(suggestions, BASH_TOOL_NAME, stripBashRedirections);
+      const label = generateShellSuggestionsLabel(suggestions, SHELL_COMMAND_TOOL_NAME, stripBashRedirections);
       if (label) {
         options.push({
           label,

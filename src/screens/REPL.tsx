@@ -126,7 +126,6 @@ import { stripDangerousPermissionsForAutoMode } from '../utils/permissions/permi
 import { getScratchpadDir, isScratchpadEnabled } from '../utils/permissions/filesystem.js';
 import { WEB_FETCH_TOOL_NAME } from '../tools/WebFetchTool/prompt.js';
 import { SLEEP_TOOL_NAME } from '../tools/SleepTool/prompt.js';
-import { clearSpeculativeChecks } from '../tools/BashTool/bashPermissions.js';
 import type { AutoUpdaterResult } from '../utils/autoUpdater.js';
 import { getGlobalConfig, saveGlobalConfig, getGlobalConfigWriteCount } from '../utils/config.js';
 import { hasConsoleBillingAccess } from '../utils/billing.js';
@@ -174,7 +173,7 @@ import type { PastedContent } from '../utils/config.js';
 import { copyPlanForFork, copyPlanForResume, getPlanSlug, setPlanSlug } from '../utils/plans.js';
 import { clearSessionMetadata, resetSessionFilePointer, adoptResumedSessionFile, removeTranscriptMessage, restoreSessionMetadata, getCurrentSessionTitle, isEphemeralToolProgress, isLoggableMessage, saveWorktreeState, getAgentTranscript } from '../utils/sessionStorage.js';
 import { deserializeMessages } from '../utils/conversationRecovery.js';
-import { extractReadFilesFromMessages, extractBashToolsFromMessages } from '../utils/queryHelpers.js';
+import { extractReadFilesFromMessages, extractShellCommandsFromMessages } from '../utils/queryHelpers.js';
 import { resetMicrocompactState } from '../services/compact/microCompact.js';
 import { runPostCompactCleanup } from '../services/compact/postCompactCleanup.js';
 import { provisionContentReplacementState, reconstructContentReplacementState, type ContentReplacementRecord } from '../utils/toolResultStorage.js';
@@ -1531,15 +1530,15 @@ export function REPL({
   const pickNewSpinnerTip = useCallback(() => {
     if (tipPickedThisTurnRef.current) return;
     tipPickedThisTurnRef.current = true;
-    const newMessages = messagesRef.current.slice(bashToolsProcessedIdx.current);
-    for (const tool of extractBashToolsFromMessages(newMessages)) {
-      bashTools.current.add(tool);
+    const newMessages = messagesRef.current.slice(shellCommandToolsProcessedIdx.current);
+    for (const tool of extractShellCommandsFromMessages(newMessages)) {
+      shellCommandTools.current.add(tool);
     }
-    bashToolsProcessedIdx.current = messagesRef.current.length;
+    shellCommandToolsProcessedIdx.current = messagesRef.current.length;
     void getTipToShowOnSpinner({
       theme,
       readFileState: readFileState.current,
-      bashTools: bashTools.current
+      shellCommandTools: shellCommandTools.current
     }).then(async tip => {
       if (tip) {
         const content = await tip.content({
@@ -1580,10 +1579,6 @@ export function REPL({
     setSpinnerShimmerColor(null);
     pickNewSpinnerTip();
     endInteractionSpan();
-    // Speculative bash classifier checks are only valid for the current
-    // turn's commands — clear after each turn to avoid accumulating
-    // Promise chains for unconsumed checks (denied/aborted paths).
-    clearSpeculativeChecks();
   }, [pickNewSpinnerTip]);
 
   // Session backgrounding — hook is below, after getToolUseContext
@@ -1953,8 +1948,8 @@ export function REPL({
   // it exactly once, then feed that stable reference into useRef.
   const [initialReadFileState] = useState(() => createFileStateCacheWithSizeLimit(READ_FILE_STATE_CACHE_SIZE));
   const readFileState = useRef(initialReadFileState);
-  const bashTools = useRef(new Set<string>());
-  const bashToolsProcessedIdx = useRef(0);
+  const shellCommandTools = useRef(new Set<string>());
+  const shellCommandToolsProcessedIdx = useRef(0);
   // Session-scoped skill discovery tracking (feeds was_discovered on
   // tengu_skill_tool_invocation). Must persist across getToolUseContext
   // rebuilds within a session: turn-0 discovery writes via processUserInput
@@ -1971,8 +1966,8 @@ export function REPL({
   const restoreReadFileState = useCallback((messages: MessageType[], cwd: string) => {
     const extracted = extractReadFilesFromMessages(messages, cwd, READ_FILE_STATE_CACHE_SIZE);
     readFileState.current = mergeFileStateCaches(readFileState.current, extracted);
-    for (const tool of extractBashToolsFromMessages(messages)) {
-      bashTools.current.add(tool);
+    for (const tool of extractShellCommandsFromMessages(messages)) {
+      shellCommandTools.current.add(tool);
     }
   }, []);
 
@@ -3052,8 +3047,8 @@ export function REPL({
         });
         haikuTitleAttemptedRef.current = false;
         setHaikuTitle(undefined);
-        bashTools.current.clear();
-        bashToolsProcessedIdx.current = 0;
+        shellCommandTools.current.clear();
+        shellCommandToolsProcessedIdx.current = 0;
 
         // Restore the plan slug for the new session so getPlan() finds the file
         if (oldPlanSlug) {
@@ -4793,8 +4788,8 @@ export function REPL({
               });
               haikuTitleAttemptedRef.current = false;
               setHaikuTitle(undefined);
-              bashTools.current.clear();
-              bashToolsProcessedIdx.current = 0;
+              shellCommandTools.current.clear();
+              shellCommandToolsProcessedIdx.current = 0;
             }
             skipIdleCheckRef.current = true;
             void onSubmitRef.current(pending.input, {

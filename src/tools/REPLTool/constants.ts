@@ -1,6 +1,6 @@
 import { isEnvDefinedFalsy, isEnvTruthy } from '../../utils/envUtils.js'
 import { AGENT_TOOL_NAME } from '../AgentTool/constants.js'
-import { BASH_TOOL_NAME } from '../BashTool/toolName.js'
+import { SHELL_COMMAND_TOOL_NAME } from '../ShellCommandTool/toolName.js'
 import { FILE_EDIT_TOOL_NAME } from '../FileEditTool/constants.js'
 import { FILE_READ_TOOL_NAME } from '../FileReadTool/prompt.js'
 import { FILE_WRITE_TOOL_NAME } from '../FileWriteTool/prompt.js'
@@ -40,7 +40,7 @@ export const REPL_ONLY_TOOLS = new Set([
   FILE_EDIT_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
-  BASH_TOOL_NAME,
+  SHELL_COMMAND_TOOL_NAME,
   NOTEBOOK_EDIT_TOOL_NAME,
   AGENT_TOOL_NAME,
 ])

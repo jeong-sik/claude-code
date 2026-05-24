@@ -7,7 +7,7 @@ type Props = {
   addMargin: boolean;
   param: TextBlockParam;
 };
-export function UserBashInputMessage(t0) {
+export function UserShellCommandInputMessage(t0) {
   const $ = _c(8);
   const {
     param: t1,

@@ -1,4 +1,4 @@
-import { BASH_TOOL_NAME } from '../tools/BashTool/toolName.js'
+import { SHELL_COMMAND_TOOL_NAME } from '../tools/ShellCommandTool/toolName.js'
 import { FILE_READ_TOOL_NAME } from '../tools/FileReadTool/prompt.js'
 import { GREP_TOOL_NAME } from '../tools/GrepTool/prompt.js'
 import { WEB_FETCH_TOOL_NAME } from '../tools/WebFetchTool/prompt.js'
@@ -103,10 +103,10 @@ function getLargeToolSuggestion(
   const tokenStr = formatTokens(tokens)
 
   switch (toolName) {
-    case BASH_TOOL_NAME:
+    case SHELL_COMMAND_TOOL_NAME:
       return {
         severity: 'warning',
-        title: `Bash results using ${tokenStr} tokens (${percent.toFixed(0)}%)`,
+        title: `Shell results using ${tokenStr} tokens (${percent.toFixed(0)}%)`,
         detail:
           'Pipe output through head, tail, or grep to reduce result size. Avoid cat on large files \u2014 use Read with offset/limit instead.',
         savingsTokens: Math.floor(tokens * 0.5),

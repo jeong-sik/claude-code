@@ -265,7 +265,7 @@ export function useInboxPoller({
 
         if (setToolUseConfirmQueue) {
           // Route through the standard ToolUseConfirmQueue so tmux workers
-          // get the same tool-specific UI (BashPermissionRequest, FileEditToolDiff, etc.)
+          // get the same tool-specific UI (ShellCommandPermissionRequest, FileEditToolDiff, etc.)
           // as in-process teammates.
           const tool = findToolByName(getAllBaseTools(), parsed.tool_name)
           if (!tool) {

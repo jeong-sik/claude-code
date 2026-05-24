@@ -1,7 +1,7 @@
 import type { PermissionRule } from 'src/utils/permissions/PermissionRule.js'
 import { getSettingsForSource } from 'src/utils/settings/settings.js'
 import type { SettingsJson } from 'src/utils/settings/types.js'
-import { BASH_TOOL_NAME } from '../../tools/BashTool/toolName.js'
+import { SHELL_COMMAND_TOOL_NAME } from '../../tools/ShellCommandTool/toolName.js'
 import { SAFE_ENV_VARS } from '../../utils/managedEnvConstants.js'
 import { getPermissionRulesForSource } from '../../utils/permissions/permissionsLoader.js'
 
@@ -42,29 +42,29 @@ export function getHooksSources(): string[] {
   return sources
 }
 
-function hasBashPermission(rules: PermissionRule[]): boolean {
+function hasShellPermission(rules: PermissionRule[]): boolean {
   return rules.some(
     rule =>
       rule.ruleBehavior === 'allow' &&
-      (rule.ruleValue.toolName === BASH_TOOL_NAME ||
-        rule.ruleValue.toolName.startsWith(BASH_TOOL_NAME + '(')),
+      (rule.ruleValue.toolName === SHELL_COMMAND_TOOL_NAME ||
+        rule.ruleValue.toolName.startsWith(SHELL_COMMAND_TOOL_NAME + '(')),
   )
 }
 
 /**
- * Get which setting sources have bash allow rules.
- * Returns an array of file paths that have bash permissions.
+ * Get which setting sources have shell command allow rules.
+ * Returns an array of file paths that have shell command permissions.
  */
-export function getBashPermissionSources(): string[] {
+export function getShellCommandPermissionSources(): string[] {
   const sources: string[] = []
 
   const projectRules = getPermissionRulesForSource('projectSettings')
-  if (hasBashPermission(projectRules)) {
+  if (hasShellPermission(projectRules)) {
     sources.push('.claude/settings.json')
   }
 
   const localRules = getPermissionRulesForSource('localSettings')
-  if (hasBashPermission(localRules)) {
+  if (hasShellPermission(localRules)) {
     sources.push('.claude/settings.local.json')
   }
 

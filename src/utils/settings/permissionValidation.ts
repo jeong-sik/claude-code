@@ -5,7 +5,7 @@ import { permissionRuleValueFromString } from '../permissions/permissionRulePars
 import { capitalize } from '../stringUtils.js'
 import {
   getCustomValidation,
-  isBashPrefixTool,
+  isShellPrefixTool,
   isFilePatternTool,
 } from './toolValidationConfig.js'
 
@@ -153,7 +153,7 @@ export function validatePermissionRule(rule: string): {
   }
 
   // Bash-specific validation
-  if (isBashPrefixTool(parsed.toolName) && parsed.ruleContent !== undefined) {
+  if (isShellPrefixTool(parsed.toolName) && parsed.ruleContent !== undefined) {
     const content = parsed.ruleContent
 
     // Check for common :* mistakes - :* must be at the end (legacy prefix syntax)

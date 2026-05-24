@@ -7,7 +7,7 @@ import { useExitOnCtrlCDWithKeybindings } from '../../../hooks/useExitOnCtrlCDWi
 import { useTerminalSize } from '../../../hooks/useTerminalSize.js';
 import { Box, Newline, Text } from '../../../ink.js';
 import { useKeybinding } from '../../../keybindings/useKeybinding.js';
-import { BashTool } from '../../../tools/BashTool/BashTool.js';
+import { ShellCommandTool } from '../../../tools/ShellCommandTool/ShellCommandTool.js';
 import { WebFetchTool } from '../../../tools/WebFetchTool/WebFetchTool.js';
 import type { PermissionBehavior, PermissionRuleValue } from '../../../utils/permissions/PermissionRule.js';
 import { permissionRuleValueFromString, permissionRuleValueToString } from '../../../utils/permissions/permissionRuleParser.js';
@@ -88,7 +88,7 @@ export function PermissionRuleInput(t0) {
   let t7;
   if ($[9] === Symbol.for("react.memo_cache_sentinel")) {
     t7 = <Text>Permission rules are a tool name, optionally followed by a specifier in parentheses.{t4}e.g.,{" "}{t5}{t6}<Text bold={true}>{permissionRuleValueToString({
-          toolName: BashTool.name,
+          toolName: ShellCommandTool.name,
           ruleContent: "ls:*"
         })}</Text></Text>;
     $[9] = t7;

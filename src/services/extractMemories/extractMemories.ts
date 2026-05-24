@@ -28,7 +28,7 @@ import {
   isAutoMemPath,
 } from '../../memdir/paths.js'
 import type { Tool } from '../../Tool.js'
-import { BASH_TOOL_NAME } from '../../tools/BashTool/toolName.js'
+import { SHELL_COMMAND_TOOL_NAME } from '../../tools/ShellCommandTool/toolName.js'
 import { FILE_EDIT_TOOL_NAME } from '../../tools/FileEditTool/constants.js'
 import { FILE_READ_TOOL_NAME } from '../../tools/FileReadTool/prompt.js'
 import { FILE_WRITE_TOOL_NAME } from '../../tools/FileWriteTool/prompt.js'
@@ -190,9 +190,9 @@ export function createAutoMemCanUseTool(memoryDir: string): CanUseToolFn {
       return { behavior: 'allow' as const, updatedInput: input }
     }
 
-    // Allow Bash only for commands that pass BashTool.isReadOnly.
-    // `tool` IS BashTool here — no static import needed.
-    if (tool.name === BASH_TOOL_NAME) {
+    // Allow shell commands only for commands that pass ShellCommandTool.isReadOnly.
+    // `tool` IS ShellCommandTool here — no static import needed.
+    if (tool.name === SHELL_COMMAND_TOOL_NAME) {
       const parsed = tool.inputSchema.safeParse(input)
       if (parsed.success && tool.isReadOnly(parsed.data)) {
         return { behavior: 'allow' as const, updatedInput: input }
@@ -216,7 +216,7 @@ export function createAutoMemCanUseTool(memoryDir: string): CanUseToolFn {
 
     return denyAutoMemTool(
       tool,
-      `only ${FILE_READ_TOOL_NAME}, ${GREP_TOOL_NAME}, ${GLOB_TOOL_NAME}, read-only ${BASH_TOOL_NAME}, and ${FILE_EDIT_TOOL_NAME}/${FILE_WRITE_TOOL_NAME} within ${memoryDir} are allowed`,
+      `only ${FILE_READ_TOOL_NAME}, ${GREP_TOOL_NAME}, ${GLOB_TOOL_NAME}, read-only ${SHELL_COMMAND_TOOL_NAME}, and ${FILE_EDIT_TOOL_NAME}/${FILE_WRITE_TOOL_NAME} within ${memoryDir} are allowed`,
     )
   }
 }

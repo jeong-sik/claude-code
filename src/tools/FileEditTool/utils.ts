@@ -397,7 +397,7 @@ export function getSnippetForTwoFileDiff(
   }
 
   // Truncate at the last line boundary that fits within the cap.
-  // Marker format matches BashTool/utils.ts.
+  // Marker format matches ShellCommandTool/utils.ts.
   const cutoff = full.lastIndexOf('\n', DIFF_SNIPPET_MAX_BYTES)
   const kept =
     cutoff > 0 ? full.slice(0, cutoff) : full.slice(0, DIFF_SNIPPET_MAX_BYTES)

@@ -83,7 +83,7 @@ const TOOL_VERBS: Record<string, string> = {
   FileEditTool: 'Editing',
   GlobTool: 'Searching',
   GrepTool: 'Searching',
-  BashTool: 'Running',
+  ShellCommandTool: 'Running',
   NotebookEditTool: 'Editing notebook',
   LSP: 'LSP',
 }

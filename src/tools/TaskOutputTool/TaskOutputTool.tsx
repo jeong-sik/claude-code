@@ -25,7 +25,7 @@ import { updateTaskState } from '../../utils/task/framework.js';
 import { formatTaskOutput } from '../../utils/task/outputFormatting.js';
 import type { ThemeName } from '../../utils/theme.js';
 import { AgentPromptDisplay, AgentResponseDisplay } from '../AgentTool/UI.js';
-import BashToolResultMessage from '../BashTool/BashToolResultMessage.js';
+import ShellCommandToolResultMessage from '../ShellCommandTool/ShellCommandToolResultMessage.js';
 import { TASK_OUTPUT_TOOL_NAME } from './constants.js';
 const inputSchema = lazySchema(() => z.strictObject({
   task_id: z.string().describe('The task ID to get output from'),
@@ -400,7 +400,7 @@ function TaskOutputResultDisplay(t0) {
     const bashOut = t3;
     let t4;
     if ($[6] !== bashOut || $[7] !== verbose) {
-      t4 = <BashToolResultMessage content={bashOut} verbose={verbose} />;
+      t4 = <ShellCommandToolResultMessage content={bashOut} verbose={verbose} />;
       $[6] = bashOut;
       $[7] = verbose;
       $[8] = t4;

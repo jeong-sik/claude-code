@@ -1,8 +1,8 @@
 import { c as _c } from "react/compiler-runtime";
 import * as React from 'react';
-import BashToolResultMessage from '../../tools/BashTool/BashToolResultMessage.js';
+import ShellCommandToolResultMessage from '../../tools/ShellCommandTool/ShellCommandToolResultMessage.js';
 import { extractTag } from '../../utils/messages.js';
-export function UserBashOutputMessage(t0) {
+export function UserShellCommandOutputMessage(t0) {
   const $ = _c(10);
   const {
     content,
@@ -42,7 +42,7 @@ export function UserBashOutputMessage(t0) {
   const t4 = !!verbose;
   let t5;
   if ($[7] !== t3 || $[8] !== t4) {
-    t5 = <BashToolResultMessage content={t3} verbose={t4} />;
+    t5 = <ShellCommandToolResultMessage content={t3} verbose={t4} />;
     $[7] = t3;
     $[8] = t4;
     $[9] = t5;

@@ -199,7 +199,7 @@ export async function getCommandPrefixStatic(
  * structured fields (nameType, args). Passing text would require reparsing,
  * which spawns pwsh.exe per subcommand — expensive and wasteful since we
  * already have the parsed elements here. Bash's equivalent passes text
- * because BashTool.isReadOnly works from regex/patterns, not parsed AST.
+ * because ShellCommandTool.isReadOnly works from regex/patterns, not parsed AST.
  */
 export async function getCompoundCommandPrefixesStatic(
   command: string,

@@ -123,11 +123,103 @@ export function resetCwdIfOutsideProject(
   ) {
     setCwd(originalCwd)
     if (!shouldMaintain) {
-      logEvent('tengu_bash_tool_reset_to_original_dir', {})
+      logEvent('tengu_shell_command_tool_reset_to_original_dir', {})
       return true
     }
   }
   return false
+}
+
+/**
+ * If the first line of a shell command is a `# comment` (not a `#!` shebang),
+ * return the comment text stripped of the `#` prefix. Otherwise undefined.
+ */
+export function extractShellCommandCommentLabel(command: string): string | undefined {
+  const nl = command.indexOf('\n')
+  const firstLine = (nl === -1 ? command : command.slice(0, nl)).trim()
+  if (!firstLine.startsWith('#') || firstLine.startsWith('#!')) return undefined
+  return firstLine.replace(/^#+\s*/, '') || undefined
+}
+
+type DestructivePattern = { pattern: RegExp; warning: string }
+
+const DESTRUCTIVE_PATTERNS: DestructivePattern[] = [
+  {
+    pattern: /\bgit\s+reset\s+--hard\b/,
+    warning: 'Note: may discard uncommitted changes',
+  },
+  {
+    pattern: /\bgit\s+push\b[^;&|\n]*[ \t](--force|--force-with-lease|-f)\b/,
+    warning: 'Note: may overwrite remote history',
+  },
+  {
+    pattern:
+      /\bgit\s+clean\b(?![^;&|\n]*(?:-[a-zA-Z]*n|--dry-run))[^;&|\n]*-[a-zA-Z]*f/,
+    warning: 'Note: may permanently delete untracked files',
+  },
+  {
+    pattern: /\bgit\s+checkout\s+(--\s+)?\.[ \t]*($|[;&|\n])/,
+    warning: 'Note: may discard all working tree changes',
+  },
+  {
+    pattern: /\bgit\s+restore\s+(--\s+)?\.[ \t]*($|[;&|\n])/,
+    warning: 'Note: may discard all working tree changes',
+  },
+  {
+    pattern: /\bgit\s+stash[ \t]+(drop|clear)\b/,
+    warning: 'Note: may permanently remove stashed changes',
+  },
+  {
+    pattern:
+      /\bgit\s+branch\s+(-D[ \t]|--delete\s+--force|--force\s+--delete)\b/,
+    warning: 'Note: may force-delete a branch',
+  },
+  {
+    pattern: /\bgit\s+(commit|push|merge)\b[^;&|\n]*--no-verify\b/,
+    warning: 'Note: may skip safety hooks',
+  },
+  {
+    pattern: /\bgit\s+commit\b[^;&|\n]*--amend\b/,
+    warning: 'Note: may rewrite the last commit',
+  },
+  {
+    pattern:
+      /(^|[;&|\n]\s*)rm\s+-[a-zA-Z]*[rR][a-zA-Z]*f|(^|[;&|\n]\s*)rm\s+-[a-zA-Z]*f[a-zA-Z]*[rR]/,
+    warning: 'Note: may recursively force-remove files',
+  },
+  {
+    pattern: /(^|[;&|\n]\s*)rm\s+-[a-zA-Z]*[rR]/,
+    warning: 'Note: may recursively remove files',
+  },
+  {
+    pattern: /(^|[;&|\n]\s*)rm\s+-[a-zA-Z]*f/,
+    warning: 'Note: may force-remove files',
+  },
+  {
+    pattern: /\b(DROP|TRUNCATE)\s+(TABLE|DATABASE|SCHEMA)\b/i,
+    warning: 'Note: may drop or truncate database objects',
+  },
+  {
+    pattern: /\bDELETE\s+FROM\s+\w+[ \t]*(;|"|'|\n|$)/i,
+    warning: 'Note: may delete all rows from a database table',
+  },
+  {
+    pattern: /\bkubectl\s+delete\b/,
+    warning: 'Note: may delete Kubernetes resources',
+  },
+  {
+    pattern: /\bterraform\s+destroy\b/,
+    warning: 'Note: may destroy Terraform infrastructure',
+  },
+]
+
+export function getDestructiveCommandWarning(command: string): string | null {
+  for (const { pattern, warning } of DESTRUCTIVE_PATTERNS) {
+    if (pattern.test(command)) {
+      return warning
+    }
+  }
+  return null
 }
 
 export function formatOutput(content: string): {
@@ -162,4 +254,99 @@ export function formatOutput(content: string): {
     truncatedContent: truncated,
     isImage,
   }
+}
+
+// ---------------------------------------------------------------------------
+// Permission prefix helpers
+// ---------------------------------------------------------------------------
+
+const ENV_VAR_ASSIGN_RE = /^[A-Za-z_]\w*=/
+
+const BARE_SHELL_PREFIXES = new Set([
+  'sh', 'bash', 'zsh', 'fish', 'csh', 'tcsh', 'ksh', 'dash',
+  'cmd', 'powershell', 'pwsh',
+  'env', 'xargs',
+  'nice', 'stdbuf', 'nohup', 'timeout', 'time',
+])
+
+const SAFE_ENV_VARS = new Set([
+  'GOEXPERIMENT', 'GOOS', 'GOARCH', 'CGO_ENABLED', 'GO111MODULE',
+  'RUST_BACKTRACE', 'RUST_LOG',
+  'NODE_ENV',
+  'PYTHONUNBUFFERED', 'PYTHONDONTWRITEBYTECODE',
+  'PYTEST_DISABLE_PLUGIN_AUTOLOAD', 'PYTEST_DEBUG',
+  'ANTHROPIC_API_KEY',
+  'LANG', 'LANGUAGE', 'LC_ALL', 'LC_CTYPE', 'LC_TIME', 'CHARSET',
+  'TERM', 'COLORTERM', 'NO_COLOR', 'FORCE_COLOR', 'TZ',
+  'LS_COLORS', 'LSCOLORS', 'GREP_COLOR', 'GREP_COLORS', 'GCC_COLORS',
+  'TIME_STYLE', 'BLOCK_SIZE', 'BLOCKSIZE',
+])
+
+const ANT_ONLY_SAFE_ENV_VARS = new Set([
+  'KUBECONFIG', 'DOCKER_HOST',
+  'AWS_PROFILE', 'CLOUDSDK_CORE_PROJECT', 'CLUSTER',
+  'COO_CLUSTER', 'COO_CLUSTER_NAME', 'COO_NAMESPACE', 'COO_LAUNCH_YAML_DRY_RUN',
+  'SKIP_NODE_VERSION_CHECK', 'EXPECTTEST_ACCEPT', 'CI', 'GIT_LFS_SKIP_SMUDGE',
+  'CUDA_VISIBLE_DEVICES',
+])
+
+/**
+ * Extract a stable command prefix (command + subcommand) from a raw command string.
+ * Skips leading env var assignments only if they are in SAFE_ENV_VARS.
+ */
+export function getSimpleCommandPrefix(command: string): string | null {
+  const tokens = command.trim().split(/\s+/).filter(Boolean)
+  if (tokens.length === 0) return null
+
+  let i = 0
+  while (i < tokens.length && ENV_VAR_ASSIGN_RE.test(tokens[i]!)) {
+    const varName = tokens[i]!.split('=')[0]!
+    const isAntOnlySafe =
+      process.env.USER_TYPE === 'ant' && ANT_ONLY_SAFE_ENV_VARS.has(varName)
+    if (!SAFE_ENV_VARS.has(varName) && !isAntOnlySafe) {
+      return null
+    }
+    i++
+  }
+
+  const remaining = tokens.slice(i)
+  if (remaining.length === 0) return null
+
+  const cmd = remaining[0]!
+  const sub = remaining[1]
+
+  if (BARE_SHELL_PREFIXES.has(cmd)) return null
+  if (!sub) return cmd
+
+  // Reject if second token doesn't look like a subcommand
+  if (!/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/.test(sub)) {
+    return cmd
+  }
+
+  return `${cmd} ${sub}`
+}
+
+/**
+ * UI-only fallback: extract the first word alone when getSimpleCommandPrefix
+ * declines.
+ */
+export function getFirstWordPrefix(command: string): string | null {
+  const tokens = command.trim().split(/\s+/).filter(Boolean)
+
+  let i = 0
+  while (i < tokens.length && ENV_VAR_ASSIGN_RE.test(tokens[i]!)) {
+    const varName = tokens[i]!.split('=')[0]!
+    const isAntOnlySafe =
+      process.env.USER_TYPE === 'ant' && ANT_ONLY_SAFE_ENV_VARS.has(varName)
+    if (!SAFE_ENV_VARS.has(varName) && !isAntOnlySafe) {
+      return null
+    }
+    i++
+  }
+
+  const cmd = tokens[i]
+  if (!cmd) return null
+  if (!/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/.test(cmd)) return null
+  if (BARE_SHELL_PREFIXES.has(cmd)) return null
+  return cmd
 }

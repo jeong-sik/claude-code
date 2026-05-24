@@ -49,7 +49,7 @@ import {
   logEvent,
 } from '../../services/analytics/index.js'
 import { AGENT_TOOL_NAME } from '../../tools/AgentTool/constants.js'
-import { BASH_TOOL_NAME } from '../../tools/BashTool/toolName.js'
+import { SHELL_COMMAND_TOOL_NAME } from '../../tools/ShellCommandTool/toolName.js'
 /* eslint-enable @typescript-eslint/no-require-imports */
 import { POWERSHELL_TOOL_NAME } from '../../tools/PowerShellTool/toolName.js'
 import { getToolsForDefaultPreset, parseToolPreset } from '../../tools.js'
@@ -91,12 +91,12 @@ import {
  * 2. Prefix rules for script interpreters (python:*, node:*, etc.)
  * 3. Wildcard rules matching interpreters (python*, node*, etc.)
  */
-export function isDangerousBashPermission(
+export function isDangerousShellCommandPermission(
   toolName: string,
   ruleContent: string | undefined,
 ): boolean {
-  // Only check Bash rules
-  if (toolName !== BASH_TOOL_NAME) {
+  // Only check shell command rules
+  if (toolName !== SHELL_COMMAND_TOOL_NAME) {
     return false
   }
 
@@ -278,7 +278,7 @@ function isDangerousClassifierPermission(
     if (toolName === 'Tmux') return true
   }
   return (
-    isDangerousBashPermission(toolName, ruleContent) ||
+    isDangerousShellCommandPermission(toolName, ruleContent) ||
     isDangerousPowerShellPermission(toolName, ruleContent) ||
     isDangerousTaskPermission(toolName, ruleContent)
   )
@@ -352,7 +352,7 @@ export function isOverlyBroadBashAllowRule(
   ruleValue: PermissionRuleValue,
 ): boolean {
   return (
-    ruleValue.toolName === BASH_TOOL_NAME && ruleValue.ruleContent === undefined
+    ruleValue.toolName === SHELL_COMMAND_TOOL_NAME && ruleValue.ruleContent === undefined
   )
 }
 
@@ -376,7 +376,7 @@ export function isOverlyBroadPowerShellAllowRule(
  * An overly broad rule allows ALL bash commands (e.g., Bash or Bash(*)),
  * which is effectively equivalent to YOLO/bypass-permissions mode.
  */
-export function findOverlyBroadBashPermissions(
+export function findOverlyBroadShellCommandPermissions(
   rules: PermissionRule[],
   cliAllowedTools: string[],
 ): DangerousPermissionInfo[] {
@@ -390,7 +390,7 @@ export function findOverlyBroadBashPermissions(
       overlyBroad.push({
         ruleValue: rule.ruleValue,
         source: rule.source,
-        ruleDisplay: `${BASH_TOOL_NAME}(*)`,
+        ruleDisplay: `${SHELL_COMMAND_TOOL_NAME}(*)`,
         sourceDisplay: formatPermissionSource(rule.source),
       })
     }
@@ -402,7 +402,7 @@ export function findOverlyBroadBashPermissions(
       overlyBroad.push({
         ruleValue: parsed,
         source: 'cliArg',
-        ruleDisplay: `${BASH_TOOL_NAME}(*)`,
+        ruleDisplay: `${SHELL_COMMAND_TOOL_NAME}(*)`,
         sourceDisplay: '--allowed-tools',
       })
     }
@@ -412,7 +412,7 @@ export function findOverlyBroadBashPermissions(
 }
 
 /**
- * PowerShell equivalent of findOverlyBroadBashPermissions.
+ * PowerShell equivalent of findOverlyBroadShellCommandPermissions.
  */
 export function findOverlyBroadPowerShellPermissions(
   rules: PermissionRule[],
@@ -887,7 +887,7 @@ export async function initializeToolPermissionContext({
   toolPermissionContext: ToolPermissionContext
   warnings: string[]
   dangerousPermissions: DangerousPermissionInfo[]
-  overlyBroadBashPermissions: DangerousPermissionInfo[]
+  overlyBroadShellCommandPermissions: DangerousPermissionInfo[]
 }> {
   // Parse comma-separated allowed and disallowed tools if provided
   // Normalize legacy tool names (e.g., 'Task' → 'Agent') so that in-memory
@@ -949,14 +949,14 @@ export async function initializeToolPermissionContext({
   // Bash(*) or PowerShell(*) are equivalent to YOLO mode for that shell.
   // Skip in CCR/BYOC where --allowed-tools is the intended pre-approval mechanism.
   // Variable name kept for return-field compat; contains both shells.
-  let overlyBroadBashPermissions: DangerousPermissionInfo[] = []
+  let overlyBroadShellCommandPermissions: DangerousPermissionInfo[] = []
   if (
     process.env.USER_TYPE === 'ant' &&
     !isEnvTruthy(process.env.CLAUDE_CODE_REMOTE) &&
     process.env.CLAUDE_CODE_ENTRYPOINT !== 'local-agent'
   ) {
-    overlyBroadBashPermissions = [
-      ...findOverlyBroadBashPermissions(rulesFromDisk, parsedAllowedToolsCli),
+    overlyBroadShellCommandPermissions = [
+      ...findOverlyBroadShellCommandPermissions(rulesFromDisk, parsedAllowedToolsCli),
       ...findOverlyBroadPowerShellPermissions(
         rulesFromDisk,
         parsedAllowedToolsCli,
@@ -1028,7 +1028,7 @@ export async function initializeToolPermissionContext({
     toolPermissionContext,
     warnings,
     dangerousPermissions,
-    overlyBroadBashPermissions,
+    overlyBroadShellCommandPermissions,
   }
 }
 

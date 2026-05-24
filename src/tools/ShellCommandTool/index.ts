@@ -14,6 +14,17 @@ export { getBaseCommand, getAllBaseCommands } from './ir-helpers.js'
 export { classifyShellIr, isReadOperation, isDestructive } from './risk.js'
 export { evaluateGate } from './gate.js'
 export { SHELL_COMMAND_TOOL_NAME } from './toolName.js'
+export { shouldUseSandbox } from './shouldUseSandbox.js'
+export {
+  extractShellCommandCommentLabel,
+  getDestructiveCommandWarning,
+} from './utils.js'
+export {
+  isSedInPlaceEdit,
+  parseSedEditCommand,
+  applySedSubstitution,
+} from './sedEditParser.js'
+export type { SedEditInfo } from './sedEditParser.js'
 export type {
   RiskClass,
   ShellIrMode,

@@ -1,6 +1,6 @@
 import type { Tool } from '../../Tool.js'
 import { AgentTool } from '../AgentTool/AgentTool.js'
-import { BashTool } from '../BashTool/BashTool.js'
+import { ShellCommandTool } from '../ShellCommandTool/ShellCommandTool.js'
 import { FileEditTool } from '../FileEditTool/FileEditTool.js'
 import { FileReadTool } from '../FileReadTool/FileReadTool.js'
 import { FileWriteTool } from '../FileWriteTool/FileWriteTool.js'
@@ -32,7 +32,7 @@ export function getReplPrimitiveTools(): readonly Tool[] {
     FileEditTool,
     GlobTool,
     GrepTool,
-    BashTool,
+    ShellCommandTool,
     NotebookEditTool,
     AgentTool,
   ])

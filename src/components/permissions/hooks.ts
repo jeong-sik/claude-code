@@ -5,7 +5,7 @@ import {
   logEvent,
 } from 'src/services/analytics/index.js'
 import { sanitizeToolNameForAnalytics } from 'src/services/analytics/metadata.js'
-import { BashTool } from 'src/tools/BashTool/BashTool.js'
+import { ShellCommandTool } from 'src/tools/ShellCommandTool/ShellCommandTool.js'
 import { splitCommand_DEPRECATED } from 'src/utils/bash/commands.js'
 import type {
   PermissionDecisionReason,
@@ -142,7 +142,7 @@ export function usePermissionRequestLogging(
     if (process.env.USER_TYPE === 'ant') {
       const permissionResult = toolUseConfirm.permissionResult
       if (
-        toolUseConfirm.tool.name === BashTool.name &&
+        toolUseConfirm.tool.name === ShellCommandTool.name &&
         permissionResult.behavior === 'ask' &&
         !hasRules(permissionResult.suggestions)
       ) {
@@ -167,9 +167,9 @@ export function usePermissionRequestLogging(
     // [ANT-ONLY] Log bash tool calls, so we can categorize
     // & burn down calls that should have been allowed
     if (process.env.USER_TYPE === 'ant') {
-      const parsedInput = BashTool.inputSchema.safeParse(toolUseConfirm.input)
+      const parsedInput = ShellCommandTool.inputSchema.safeParse(toolUseConfirm.input)
       if (
-        toolUseConfirm.tool.name === BashTool.name &&
+        toolUseConfirm.tool.name === ShellCommandTool.name &&
         toolUseConfirm.permissionResult.behavior === 'ask' &&
         parsedInput.success
       ) {
@@ -180,7 +180,7 @@ export function usePermissionRequestLogging(
         } catch {
           // Ignore parse errors here - just log the full command
         }
-        logEvent('tengu_internal_bash_tool_use_permission_request', {
+        logEvent('tengu_internal_shell_tool_use_permission_request', {
           parts: jsonStringify(
             split,
           ) as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,

@@ -1756,15 +1756,15 @@ async function run(): Promise<CommanderCommand> {
     const {
       warnings,
       dangerousPermissions,
-      overlyBroadBashPermissions
+      overlyBroadShellCommandPermissions
     } = initResult;
 
     // Handle overly broad shell allow rules for ant users (Bash(*), PowerShell(*))
-    if ("external" === 'ant' && overlyBroadBashPermissions.length > 0) {
-      for (const permission of overlyBroadBashPermissions) {
+    if ("external" === 'ant' && overlyBroadShellCommandPermissions.length > 0) {
+      for (const permission of overlyBroadShellCommandPermissions) {
         logForDebugging(`Ignoring overly broad shell permission ${permission.ruleDisplay} from ${permission.sourceDisplay}`);
       }
-      toolPermissionContext = removeDangerousPermissions(toolPermissionContext, overlyBroadBashPermissions);
+      toolPermissionContext = removeDangerousPermissions(toolPermissionContext, overlyBroadShellCommandPermissions);
     }
     if (feature('TRANSCRIPT_CLASSIFIER') && dangerousPermissions.length > 0) {
       toolPermissionContext = stripDangerousPermissionsForAutoMode(toolPermissionContext);
@@ -2894,10 +2894,10 @@ async function run(): Promise<CommanderCommand> {
         priority: 'high'
       });
     }
-    if (overlyBroadBashPermissions.length > 0) {
-      const displayList = uniq(overlyBroadBashPermissions.map(p => p.ruleDisplay));
+    if (overlyBroadShellCommandPermissions.length > 0) {
+      const displayList = uniq(overlyBroadShellCommandPermissions.map(p => p.ruleDisplay));
       const displays = displayList.join(', ');
-      const sources = uniq(overlyBroadBashPermissions.map(p => p.sourceDisplay)).join(', ');
+      const sources = uniq(overlyBroadShellCommandPermissions.map(p => p.sourceDisplay)).join(', ');
       const n = displayList.length;
       initialNotifications.push({
         key: 'overly-broad-bash-notification',

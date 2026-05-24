@@ -428,8 +428,8 @@ async function executeUserInput(params: ExecuteUserInputParams): Promise<void> {
   // which transitions running→idle; cancelReservation() below is a no-op in
   // that case (only acts on dispatching state).
   try {
-    // Reserve the guard BEFORE processUserInput — processBashCommand awaits
-    // BashTool.call() and processSlashCommand awaits getMessagesForSlashCommand,
+    // Reserve the guard BEFORE processUserInput — processShellCommand awaits
+    // ShellCommandTool.call() and processSlashCommand awaits getMessagesForSlashCommand,
     // so the guard must be active during those awaits to ensure concurrent
     // handlePromptSubmit calls queue (via the isActive check above) instead
     // of starting a second executeUserInput. This call is a no-op if the

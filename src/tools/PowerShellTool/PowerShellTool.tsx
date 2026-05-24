@@ -33,8 +33,8 @@ import { getTaskOutputPath } from '../../utils/task/diskOutput.js';
 import { TaskOutput } from '../../utils/task/TaskOutput.js';
 import { isOutputLineTruncated } from '../../utils/terminal.js';
 import { buildLargeToolResultMessage, ensureToolResultsDir, generatePreview, getToolResultPath, PREVIEW_SIZE_BYTES } from '../../utils/toolResultStorage.js';
-import { shouldUseSandbox } from '../BashTool/shouldUseSandbox.js';
-import { BackgroundHint } from '../BashTool/UI.js';
+import { shouldUseSandbox } from '../ShellCommandTool/shouldUseSandbox.js';
+import { BackgroundHint } from '../ShellCommandTool/UI.js';
 import { buildImageToolResult, isImageOutput, resetCwdIfOutsideProject, resizeShellImageOutput, stdErrAppendShellResetMessage, stripEmptyLines } from '../ShellCommandTool/utils.js';
 import { trackGitOperations } from '../shared/gitOperationTracking.js';
 import { interpretCommandResult } from './commandSemantics.js';
@@ -181,7 +181,7 @@ function isAutobackgroundingAllowed(command: string): boolean {
 }
 
 /**
- * PS-flavored port of BashTool's detectBlockedSleepPattern.
+ * PS-flavored port of ShellCommandTool's detectBlockedSleepPattern.
  * Catches `Start-Sleep N`, `Start-Sleep -Seconds N`, `sleep N` (built-in alias)
  * as the first statement. Does NOT block `Start-Sleep -Milliseconds` (sub-second
  * pacing is fine) or float seconds (legit rate limiting).
@@ -190,7 +190,7 @@ export function detectBlockedSleepPattern(command: string): string | null {
   // First statement only — split on PS statement separators: `;`, `|`,
   // `&`/`&&`/`||` (pwsh 7+), and newline (PS's primary separator). This is
   // intentionally shallow — sleep inside script blocks, subshells, or later
-  // pipeline stages is fine. Matches BashTool's splitCommandWithOperators
+  // pipeline stages is fine. Matches ShellCommandTool's splitCommandWithOperators
   // intent (src/utils/bash/commands.ts) without a full PS parser.
   const first = command.trim().split(/[;|&\r\n]/)[0]?.trim() ?? '';
   // Match: Start-Sleep N, Start-Sleep -Seconds N, Start-Sleep -s N, sleep N
@@ -301,7 +301,7 @@ export const PowerShellTool = buildTool({
     // Check sync security heuristics before declaring read-only.
     // The full AST parse is async and unavailable here, so we use
     // regex-based detection of subexpressions, splatting, member
-    // invocations, and assignments — matching BashTool's pattern of
+    // invocations, and assignments — matching ShellCommandTool's pattern of
     // checking security concerns before cmdlet allowlist evaluation.
     if (hasSyncSecurityConcerns(input.command)) {
       return false;
@@ -437,7 +437,7 @@ export const PowerShellTool = buildTool({
   async call(input: PowerShellToolInput, toolUseContext: Parameters<Tool['call']>[1], _canUseTool?: CanUseToolFn, _parentMessage?: AssistantMessage, onProgress?: ToolCallProgress<PowerShellProgress>): Promise<{
     data: Out;
   }> {
-    // Load-bearing guard: promptShellExecution.ts and processBashCommand.tsx
+    // Load-bearing guard: promptShellExecution.ts and processShellCommand.tsx
     // call PowerShellTool.call() directly, bypassing validateInput. This is
     // the check that covers ALL callers. See isWindowsSandboxPolicyViolation
     // comment for the policy rationale.
@@ -486,18 +486,18 @@ export const PowerShellTool = buildTool({
       } while (!generatorResult.done);
       const result = generatorResult.value;
 
-      // Feed git/PR usage metrics (same counters as BashTool). PS invokes
+      // Feed git/PR usage metrics (same counters as ShellCommandTool). PS invokes
       // git/gh/glab/curl as external binaries with identical syntax, so the
       // shell-agnostic regex detection in trackGitOperations works as-is.
       // Called before the backgroundTaskId early-return so backgrounded
-      // commands are counted too (matches BashTool.tsx:912).
+      // commands are counted too (matches ShellCommandTool.tsx:912).
       //
       // Pre-flight sentinel guard: the two PS pre-flight paths (pwsh-not-found,
       // exec-spawn-catch) return code: 0 + empty stdout + stderr so call() can
       // surface stderr gracefully instead of throwing ShellError. But
       // gitOperationTracking.ts:48 treats code 0 as success and would
       // regex-match the command, mis-counting a command that never ran.
-      // BashTool is safe — its pre-flight goes through createFailedCommand
+      // ShellCommandTool is safe — its pre-flight goes through createFailedCommand
       // (code: 1) so tracking early-returns. Skip tracking on this sentinel.
       const isPreFlightSentinel = result.code === 0 && !result.stdout && result.stderr && !result.backgroundTaskId;
       if (!isPreFlightSentinel) {
@@ -507,14 +507,14 @@ export const PowerShellTool = buildTool({
       // Distinguish user-driven interrupt (new message submitted) from other
       // interrupted states. Only user-interrupt should suppress ShellError —
       // timeout-kill or process-kill with isError should still throw.
-      // Matches BashTool's isInterrupt.
+      // Matches ShellCommandTool's isInterrupt.
       const isInterrupt = result.interrupted && abortController.signal.reason === 'interrupt';
 
       // Only the main thread tracks/resets cwd; agents have their own cwd
-      // isolation. Matches BashTool's !preventCwdChanges guard.
+      // isolation. Matches ShellCommandTool's !preventCwdChanges guard.
       // Runs before the backgroundTaskId early-return: a command may change
       // CWD before being backgrounded (e.g. `Set-Location C:\temp;
-      // Start-Sleep 60`), and BashTool has no such early return — its
+      // Start-Sleep 60`), and ShellCommandTool has no such early return — its
       // backgrounded results flow through resetCwdIfOutsideProject at :945.
       let stderrForShellReset = '';
       if (isMainThread) {
@@ -526,7 +526,7 @@ export const PowerShellTool = buildTool({
 
       // If backgrounded, return immediately with task ID. Strip hints first
       // so interrupt-backgrounded fullOutput doesn't leak the tag to the
-      // model (BashTool has no early return, so all paths flow through its
+      // model (ShellCommandTool has no early return, so all paths flow through its
       // single extraction site).
       if (result.backgroundTaskId) {
         const bgExtracted = extractClaudeCodeHints(result.stdout || '', input.command);
@@ -556,7 +556,7 @@ export const PowerShellTool = buildTool({
 
       // getErrorParts() in toolErrors.ts already prepends 'Exit code N'
       // from error.code when building the ShellError message. Do not
-      // duplicate it into stdout here (BashTool's append at :939 is dead
+      // duplicate it into stdout here (ShellCommandTool's append at :939 is dead
       // code — it throws before stdoutAccumulator.toString() is read).
 
       let stdout = stripEmptyLines(stdoutAccumulator.toString());
@@ -576,7 +576,7 @@ export const PowerShellTool = buildTool({
       // preSpawnError means exec() succeeded but the inner shell failed before
       // the command ran (e.g. CWD deleted). createFailedCommand sets code=1,
       // which interpretCommandResult can mistake for grep-no-match / findstr
-      // string-not-found. Throw it directly. Matches BashTool.tsx:957.
+      // string-not-found. Throw it directly. Matches ShellCommandTool.tsx:957.
       if (result.preSpawnError) {
         throw new Error(result.preSpawnError);
       }
@@ -587,9 +587,9 @@ export const PowerShellTool = buildTool({
       // Large output: file on disk has more than getMaxOutputLength() bytes.
       // stdout already contains the first chunk. Copy the output file to the
       // tool-results dir so the model can read it via FileRead. If > 64 MB,
-      // truncate after copying. Matches BashTool.tsx:983-1005.
+      // truncate after copying. Matches ShellCommandTool.tsx:983-1005.
       //
-      // Placed AFTER the preSpawnError/ShellError throws (matches BashTool's
+      // Placed AFTER the preSpawnError/ShellError throws (matches ShellCommandTool's
       // ordering, where persistence is post-try/finally): a failing command
       // that also produced >maxOutputLength bytes would otherwise do 3-4 disk
       // syscalls, store to tool-results/, then throw — orphaning the file.
@@ -706,7 +706,7 @@ async function* runPowerShellCommand({
 
   // Progress signal: resolved when backgroundShellId is set in the async
   // .then() path, waking the generator's Promise.race immediately instead of
-  // waiting for the next setTimeout tick (matches BashTool pattern).
+  // waiting for the next setTimeout tick (matches ShellCommandTool pattern).
   let resolveProgress: (() => void) | null = null;
   function createProgressSignal(): Promise<null> {
     return new Promise<null>(resolve => {
@@ -805,7 +805,7 @@ async function* runPowerShellCommand({
 
       // Wake the generator's Promise.race so it sees backgroundShellId.
       // Without this, the generator waits for the current setTimeout to fire
-      // (up to ~1s) before noticing the backgrounding. Matches BashTool.
+      // (up to ~1s) before noticing the backgrounding. Matches ShellCommandTool.
       const resolve = resolveProgress;
       if (resolve) {
         resolveProgress = null;
@@ -866,7 +866,7 @@ async function* runPowerShellCommand({
 
   // Progress loop: wrap in try/finally so stopPolling is called on every exit
   // path — normal completion, timeout/interrupt backgrounding, and Ctrl+B
-  // (matches BashTool pattern; see PR #18887 review thread at :560)
+  // (matches ShellCommandTool pattern; see PR #18887 review thread at :560)
   try {
     while (true) {
       const now = Date.now();
@@ -902,7 +902,7 @@ async function* runPowerShellCommand({
           // Command completed — cleanup stream listeners here. The finally
           // block's guard (!backgroundShellId && status !== 'backgrounded')
           // correctly skips cleanup for *running* backgrounded tasks, but
-          // in this race the process is done. Matches BashTool.tsx:1399.
+          // in this race the process is done. Matches ShellCommandTool.tsx:1399.
           shellCommand.cleanup();
           return fixedResult;
         }

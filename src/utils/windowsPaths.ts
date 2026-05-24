@@ -81,7 +81,7 @@ function findExecutable(executable: string): string | null {
 
 /**
  * If Windows, set the SHELL environment variable to git-bash path.
- * This is used by BashTool and Shell.ts for user shell commands.
+ * This is used by ShellCommandTool and Shell.ts for user shell commands.
  * COMSPEC is left unchanged for system process execution.
  */
 export function setShellIfWindows(): void {

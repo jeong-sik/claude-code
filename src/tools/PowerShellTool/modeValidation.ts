@@ -3,7 +3,7 @@
  *
  * Checks if commands should be auto-allowed based on the current permission mode.
  * In acceptEdits mode, filesystem-modifying PowerShell cmdlets are auto-allowed.
- * Follows the same patterns as BashTool/modeValidation.ts.
+ * Follows the same patterns as ShellCommandTool/modeValidation.ts.
  */
 
 import type { ToolPermissionContext } from '../../Tool.js'
@@ -189,7 +189,7 @@ export function checkPermissionMode(
     }
   }
 
-  // SECURITY: Compound cwd desync guard — BashTool parity.
+  // SECURITY: Compound cwd desync guard — ShellCommandTool parity.
   // When any statement in a compound contains Set-Location/Push-Location/Pop-Location
   // (or aliases like cd, sl, chdir, pushd, popd), the cwd changes between statements.
   // Path validation resolves relative paths against the stale process cwd, so a write
@@ -197,8 +197,8 @@ export function checkPermissionMode(
   // Example: `Set-Location ./.claude; Set-Content ./settings.json '...'` — the validator
   // sees ./settings.json as /project/settings.json, but PowerShell writes to
   // /project/.claude/settings.json. Refuse to auto-allow any write operation in a
-  // compound that contains a cwd-changing command. This matches BashTool's
-  // compoundCommandHasCd guard (BashTool/pathValidation.ts:630-655).
+  // compound that contains a cwd-changing command. This matches ShellCommandTool's
+  // compoundCommandHasCd guard (ShellCommandTool/pathValidation.ts:630-655).
   const totalCommands = segments.reduce(
     (sum, seg) => sum + seg.commands.length,
     0,

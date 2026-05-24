@@ -2,7 +2,7 @@
  * AST-based bash command analysis using tree-sitter.
  *
  * This module replaces the shell-quote + hand-rolled char-walker approach in
- * bashSecurity.ts / commands.ts. Instead of detecting parser differentials
+ * shellSecurity.ts / commands.ts. Instead of detecting parser differentials
  * one-by-one, we parse with tree-sitter-bash and walk the tree with an
  * EXPLICIT allowlist of node types. Any node type not in the allowlist causes
  * the entire command to be classified as 'too-complex', which means it goes
@@ -156,13 +156,13 @@ const SAFE_ENV_VARS = new Set([
  * their value IS the argument and might be a path/flag from $1 etc.).
  *
  * SECURITY: '@' and '*' are NOT in this set. Inside "...", they expand to
- * the positional params — which are EMPTY in a fresh BashTool shell (how we
+ * the positional params — which are EMPTY in a fresh ShellCommandTool shell (how we
  * always spawn). Returning VAR_PLACEHOLDER would lie: `git "push$*"` gives
  * argv ['git','push__TRACKED_VAR__'] while bash passes ['git','push']. Deny
  * rule Bash(git push:*) fails on both .text (raw `$*`) AND rebuilt argv
  * (placeholder). With them removed, resolveSimpleExpansion falls through to
  * tooComplex for `$*` / `$@`. `echo "args: $*"` becomes too-complex —
- * acceptable (rare in BashTool usage; `"$@"` even rarer).
+ * acceptable (rare in ShellCommandTool usage; `"$@"` even rarer).
  */
 const SPECIAL_VAR_NAMES = new Set([
   '?', // exit status of last command
@@ -281,7 +281,7 @@ const BACKSLASH_WHITESPACE_RE = /\\[ \t]|[^ \t\n\\]\\\n/
 /**
  * Zsh dynamic named directory expansion: ~[name]. In zsh this invokes the
  * zsh_directory_name hook, which can run arbitrary code. bash treats it as
- * a literal tilde followed by a glob character class. Since BashTool runs
+ * a literal tilde followed by a glob character class. Since ShellCommandTool runs
  * via the user's default shell (often zsh), reject conservatively.
  */
 const ZSH_TILDE_BRACKET_RE = /~\[/
@@ -1313,7 +1313,7 @@ function walkCommand(
     }
   }
 
-  // .text is the raw source span. Downstream (bashToolCheckPermission →
+  // .text is the raw source span. Downstream (shellCommandToolCheckPermission →
   // splitCommand_DEPRECATED) re-tokenizes it via shell-quote. Normally .text
   // is used unchanged — but if we resolved a $VAR into argv, .text diverges
   // (has raw `$VAR`) and downstream RULE MATCHING would miss deny rules.
@@ -1855,7 +1855,7 @@ function walkVariableAssignment(
   // executes at trace time: `PS4='$(id)' && set -x && :` runs id, but our
   // argv is only [["set","-x"],[":"]] — the payload is invisible to
   // permission checks. PS0-3 and PROMPT_COMMAND are not expanded in
-  // non-interactive shells (BashTool).
+  // non-interactive shells (ShellCommandTool).
   //
   // ALLOWLIST, not blocklist. 5 rounds of bypass patches taught us that a
   // value-dependent blocklist is structurally fragile:
@@ -2045,15 +2045,15 @@ function tooComplex(node: Node): ParseForSecurityResult {
 //
 // Everything above answers "can we tokenize?". Everything below answers
 // "is the resulting argv dangerous in ways that don't involve parsing?".
-// These are checks on argv[0] or argv content that the old bashSecurity.ts
+// These are checks on argv[0] or argv content that the old shellSecurity.ts
 // validators performed but which have nothing to do with parser
-// differentials. They're here (not in bashSecurity.ts) because they operate
+// differentials. They're here (not in shellSecurity.ts) because they operate
 // on SimpleCommand and need to run for every extracted command.
 // ────────────────────────────────────────────────────────────────────────────
 
 /**
  * Zsh module builtins. These are not binaries on PATH — they're zsh
- * internals loaded via zmodload. Since BashTool runs via the user's default
+ * internals loaded via zmodload. Since ShellCommandTool runs via the user's default
  * shell (often zsh), and these parse as plain `command` nodes with no
  * distinguishing syntax, we can only catch them by name.
  */
@@ -2102,7 +2102,7 @@ const EVAL_LIKE_BUILTINS = new Set([
   'noglob',
   'nocorrect',
   // `trap 'cmd' SIGNAL` — cmd runs as shell code on signal/exit. EXIT fires
-  // at end of every BashTool invocation, so this is guaranteed execution.
+  // at end of every ShellCommandTool invocation, so this is guaranteed execution.
   'trap',
   // `enable -f /path/lib.so name` — dlopen arbitrary .so as a builtin.
   // Native code execution.
@@ -2115,7 +2115,7 @@ const EVAL_LIKE_BUILTINS = new Set([
   // `cmd` in the same command resolves to /path instead of PATH lookup.
   'hash',
   // `bind -x '"key":cmd'` / `complete -C cmd` — interactive-only callbacks
-  // but still code-string arguments. Low impact in non-interactive BashTool
+  // but still code-string arguments. Low impact in non-interactive ShellCommandTool
   // shells, blocked for consistency. `compgen -C cmd` is NOT interactive-only:
   // it immediately executes the -C argument to generate completions.
   'bind',
@@ -2587,7 +2587,7 @@ export function checkSemantics(commands: SimpleCommand[]): SemanticCheckResult {
 
     // jq's system() built-in executes arbitrary shell commands, and flags
     // like --from-file can read arbitrary files into jq variables. On the
-    // legacy path these are caught by validateJqCommand in bashSecurity.ts,
+    // legacy path these are caught by validateJqCommand in shellSecurity.ts,
     // but that validator is gated behind `astSubcommands === null` and
     // never runs when the AST parse succeeds. Mirror the checks here so
     // the AST path has the same defence.
