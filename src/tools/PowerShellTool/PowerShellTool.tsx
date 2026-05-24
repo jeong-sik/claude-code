@@ -40,12 +40,26 @@ import { trackGitOperations } from '../shared/gitOperationTracking.js';
 import { interpretCommandResult } from './commandSemantics.js';
 import { powershellToolHasPermission } from './powershellPermissions.js';
 import { getDefaultTimeoutMs, getMaxTimeoutMs, getPrompt } from './prompt.js';
+import { classifyPowerShellRisk, isReadOperation, isDestructive as isDestructiveRisk } from './risk.js';
 import { hasSyncSecurityConcerns, isReadOnlyCommand, resolveToCanonical } from './readOnlyValidation.js';
 import { POWERSHELL_TOOL_NAME } from './toolName.js';
 import { renderToolResultMessage, renderToolUseErrorMessage, renderToolUseMessage, renderToolUseProgressMessage, renderToolUseQueuedMessage } from './UI.js';
 
 // Never use os.EOL for terminal output — \r\n on Windows breaks Ink rendering
 const EOL = '\n';
+
+/**
+ * Extract the canonical cmdlet name from a PowerShell command string.
+ * Strips common prefixes (module qualifiers like `Module\Cmdlet`) and
+ * normalizes to lowercase.
+ */
+function extractCmdlet(command: string): string {
+  const firstWord = command.trim().split(/\s+/)[0] ?? '';
+  if (!firstWord) return '';
+  // Strip module qualifier: `ActiveDirectory\Get-ADUser` → `get-aduser`
+  const withoutModule = firstWord.replace(/^.*\\/, '');
+  return withoutModule.toLowerCase();
+}
 
 /**
  * PowerShell search commands (grep equivalents) for collapsible display.
@@ -298,21 +312,23 @@ export const PowerShellTool = buildTool({
     return isSearchOrReadPowerShellCommand(input.command);
   },
   isReadOnly(input: PowerShellToolInput): boolean {
-    // Check sync security heuristics before declaring read-only.
-    // The full AST parse is async and unavailable here, so we use
-    // regex-based detection of subexpressions, splatting, member
-    // invocations, and assignments — matching ShellCommandTool's pattern of
-    // checking security concerns before cmdlet allowlist evaluation.
+    // Defense: sync security heuristics block read-only claims for
+    // subexpressions, splatting, member invocations, and assignments.
     if (hasSyncSecurityConcerns(input.command)) {
       return false;
     }
-    // NOTE: This calls isReadOnlyCommand without the parsed AST. Without the
-    // AST, isReadOnlyCommand cannot split pipelines/statements and will return
-    // false for anything but the simplest single-token commands. This is a
-    // known limitation of the sync Tool.isReadOnly() interface — the real
-    // read-only auto-allow happens async in powershellToolHasPermission (step
-    // 4.5) where the parsed AST is available.
-    return isReadOnlyCommand(input.command);
+    // RiskClass-based classification: same taxonomy as ShellCommandTool.
+    const cmdlet = extractCmdlet(input.command);
+    const words = input.command.trim().split(/\s+/);
+    const riskClass = classifyPowerShellRisk(cmdlet, words);
+    return isReadOperation(riskClass);
+  },
+
+  isDestructive(input: PowerShellToolInput): boolean {
+    const cmdlet = extractCmdlet(input.command);
+    const words = input.command.trim().split(/\s+/);
+    const riskClass = classifyPowerShellRisk(cmdlet, words);
+    return isDestructiveRisk(riskClass);
   },
   toAutoClassifierInput(input) {
     return input.command;
