@@ -1,4 +1,4 @@
-import { BASH_TOOL_NAME } from 'src/tools/BashTool/toolName.js'
+import { SHELL_COMMAND_TOOL_NAME } from 'src/tools/ShellCommandTool/toolName.js'
 import { FILE_READ_TOOL_NAME } from 'src/tools/FileReadTool/prompt.js'
 import { GLOB_TOOL_NAME } from 'src/tools/GlobTool/prompt.js'
 import { GREP_TOOL_NAME } from 'src/tools/GrepTool/prompt.js'
@@ -102,7 +102,7 @@ export const CLAUDE_CODE_GUIDE_AGENT: BuiltInAgentDefinition = {
   // bfs/ugrep via find/grep aliases) for local file search instead.
   tools: hasEmbeddedSearchTools()
     ? [
-        BASH_TOOL_NAME,
+        SHELL_COMMAND_TOOL_NAME,
         FILE_READ_TOOL_NAME,
         WEB_FETCH_TOOL_NAME,
         WEB_SEARCH_TOOL_NAME,

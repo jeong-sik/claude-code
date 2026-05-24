@@ -18,7 +18,7 @@ import { TODO_WRITE_TOOL_NAME } from '../tools/TodoWriteTool/constants.js'
 import { TASK_CREATE_TOOL_NAME } from '../tools/TaskCreateTool/constants.js'
 import type { Tools } from '../Tool.js'
 import type { Command } from '../types/command.js'
-import { BASH_TOOL_NAME } from '../tools/BashTool/toolName.js'
+import { SHELL_COMMAND_TOOL_NAME } from '../tools/ShellCommandTool/toolName.js'
 import {
   getCanonicalName,
   getMarketingNameForModel,
@@ -298,11 +298,11 @@ function getUsingYourToolsSection(enabledTools: Set<string>): string {
           `To search for files use ${GLOB_TOOL_NAME} instead of find or ls`,
           `To search the content of files, use ${GREP_TOOL_NAME} instead of grep or rg`,
         ]),
-    `Reserve using the ${BASH_TOOL_NAME} exclusively for system commands and terminal operations that require shell execution. If you are unsure and there is a relevant dedicated tool, default to using the dedicated tool and only fallback on using the ${BASH_TOOL_NAME} tool for these if it is absolutely necessary.`,
+    `Reserve using the ${SHELL_COMMAND_TOOL_NAME} exclusively for system commands and terminal operations that require shell execution. If you are unsure and there is a relevant dedicated tool, default to using the dedicated tool and only fallback on using the ${SHELL_COMMAND_TOOL_NAME} tool for these if it is absolutely necessary.`,
   ]
 
   const items = [
-    `Do NOT use the ${BASH_TOOL_NAME} to run commands when a relevant dedicated tool is provided. Using dedicated tools allows the user to better understand and review your work. This is CRITICAL to assisting the user:`,
+    `Do NOT use the ${SHELL_COMMAND_TOOL_NAME} to run commands when a relevant dedicated tool is provided. Using dedicated tools allows the user to better understand and review your work. This is CRITICAL to assisting the user:`,
     providedToolSubitems,
     taskToolName
       ? `Break down and manage your work with the ${taskToolName} tool. These tools are helpful for planning your work and helping the user track your progress. Mark each task as completed as soon as you are done with the task. Do not batch up multiple tasks before marking them as completed.`
@@ -358,7 +358,7 @@ function getSessionSpecificGuidanceSection(
     skillToolCommands.length > 0 && enabledTools.has(SKILL_TOOL_NAME)
   const hasAgentTool = enabledTools.has(AGENT_TOOL_NAME)
   const searchTools = hasEmbeddedSearchTools()
-    ? `\`find\` or \`grep\` via the ${BASH_TOOL_NAME} tool`
+    ? `\`find\` or \`grep\` via the ${SHELL_COMMAND_TOOL_NAME} tool`
     : `the ${GLOB_TOOL_NAME} or ${GREP_TOOL_NAME}`
 
   const items = [
